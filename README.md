@@ -37,7 +37,7 @@ pinned by default; override their build arguments only for local testing.
 
 ## Releases
 
-Tags use the independent `docker-vX.Y.Z` version line. Each release builds and
+Tags use the repository's `vX.Y.Z` version line. Each release builds and
 smoke-tests Linux amd64 and arm64 images, publishes an immutable
 `docker-sha-<commit>` tag, and promotes it to the release tag. Stable releases
 also update `latest`; alpha and beta releases update their matching channel.

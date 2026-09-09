@@ -35,7 +35,7 @@ TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
 
 ## 发布
 
-本仓使用独立的 `docker-vX.Y.Z` 版本线。每次发布构建并冒烟测试 Linux
+本仓使用 `vX.Y.Z` 版本线。每次发布构建并冒烟测试 Linux
 amd64 和 arm64 镜像，发布不可变的 `docker-sha-<commit>` tag，再提升为版本
 tag。稳定版本同时更新 `latest`，alpha 和 beta 版本更新对应 channel。
 
