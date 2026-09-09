@@ -11,11 +11,11 @@ on:
       - "scripts/docker-build-image.sh"
   push:
     tags:
-      - "docker-v*"
+      - "v*"
   workflow_dispatch:
     inputs:
       image_version:
-        description: "Docker image release version without the docker-v prefix (for example 1.0.0)"
+        description: "Release version without the v prefix (for example 1.0.0)"
         required: false
         type: string
 
@@ -60,14 +60,14 @@ jobs:
           REQUESTED_IMAGE_VERSION: ${{ inputs.image_version }}
         shell: bash
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/docker-v* ]]; then
-            version="${GITHUB_REF_NAME#docker-v}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
             node -e 'if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(process.argv[1])) process.exit(1)' "$version"
-            tag="docker-v${version}"
+            tag="v${version}"
           elif [[ -n "${REQUESTED_IMAGE_VERSION}" ]]; then
             version="${REQUESTED_IMAGE_VERSION}"
             node -e 'if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(process.argv[1])) process.exit(1)' "$version"
-            tag="docker-v${version}"
+            tag="v${version}"
           else
             version="ci-${GITHUB_SHA::7}"
             tag="ci-${GITHUB_SHA::7}"
@@ -248,14 +248,14 @@ jobs:
           done
 
       - name: Login to Docker Hub
-        if: ${{ startsWith(github.ref, 'refs/tags/docker-v') || inputs.image_version != '' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Publish immutable commit image
-        if: ${{ startsWith(github.ref, 'refs/tags/docker-v') || inputs.image_version != '' }}
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
@@ -280,7 +280,7 @@ jobs:
           done
 
   publish-multiarch-image:
-    if: ${{ startsWith(github.ref, 'refs/tags/docker-v') || inputs.image_version != '' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
     needs: docker-build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -319,7 +319,7 @@ jobs:
           done
 
   promote-release:
-    if: ${{ startsWith(github.ref, 'refs/tags/docker-v') || inputs.image_version != '' }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
     needs: publish-multiarch-image
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -338,17 +338,17 @@ jobs:
           REQUESTED_IMAGE_VERSION: ${{ inputs.image_version }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF" == refs/tags/docker-v* ]]; then
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="$GITHUB_REF_NAME"
           else
-            version="docker-v${REQUESTED_IMAGE_VERSION}"
+            version="v${REQUESTED_IMAGE_VERSION}"
           fi
-          if [[ ! "$version" =~ ^docker-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Docker release tag is not a supported semantic version: $version"
             exit 1
           fi
 
-          release_version="${version#docker-v}"
+          release_version="${version#v}"
           if [[ "$release_version" == *-* ]]; then
             prerelease="${release_version#*-}"
             channel="${prerelease%%.*}"

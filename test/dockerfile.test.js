@@ -114,23 +114,23 @@ test("Docker CI builds amd64 and arm64 concurrently and publishes a multi-archit
   assert.match(workflow, /Immutable multi-architecture image already exists; preserving/);
   assert.doesNotMatch(workflow, /branches:\s*\n\s+- main/);
   assert.doesNotMatch(workflow, /refs\/heads\/main/);
-  assert.match(workflow, /Publish immutable commit image\n\s+if: \$\{\{ startsWith\(github\.ref, 'refs\/tags\/docker-v'\) \|\| inputs\.image_version != '' \}\}/);
-  assert.match(workflow, /promote-release:\n\s+if:.*refs\/tags\/docker-v.*\n\s+needs: publish-multiarch-image/);
+  assert.match(workflow, /Publish immutable commit image\n\s+if: \$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \|\| inputs\.image_version != '' \}\}/);
+  assert.match(workflow, /promote-release:\n\s+if:.*refs\/tags\/v.*\n\s+needs: publish-multiarch-image/);
   assert.match(workflow, /REQUESTED_IMAGE_VERSION: \$\{\{ inputs\.image_version \}\}/);
-  assert.match(workflow, /version="docker-v\$\{REQUESTED_IMAGE_VERSION\}"/);
-  assert.match(workflow, /release_version="\$\{version#docker-v\}"/);
+  assert.match(workflow, /version="v\$\{REQUESTED_IMAGE_VERSION\}"/);
+  assert.match(workflow, /release_version="\$\{version#v\}"/);
   assert.match(workflow, /if \[\[ "\$release_version" != \*-\* \]\]; then/);
   assert.match(workflow, /docker run -d --name/);
   assert.doesNotMatch(workflow, /docker run --rm -d/);
   assert.doesNotMatch(workflow, /Immutable source image was not published within/);
 });
 
-test("Docker tag builds inject an independent Docker release version", () => {
+test("Release tags inject the repository version into Docker images", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "docker.yml"), "utf8");
 
-  assert.match(workflow, /if \[\[ "\$GITHUB_REF" == refs\/tags\/docker-v\* \]\]; then/);
-  assert.match(workflow, /version="\$\{GITHUB_REF_NAME#docker-v\}"/);
+  assert.match(workflow, /if \[\[ "\$GITHUB_REF" == refs\/tags\/v\* \]\]; then/);
+  assert.match(workflow, /version="\$\{GITHUB_REF_NAME#v\}"/);
   assert.match(workflow, /REQUESTED_IMAGE_VERSION: \$\{\{ inputs\.image_version \}\}/);
   assert.match(workflow, /elif \[\[ -n "\$\{REQUESTED_IMAGE_VERSION\}" \]\]; then/);
   assert.match(workflow, /codex-image-ref=\$\{DOCKERHUB_CODEX_IMAGE_NAME\}:\$\{tag\}/);
