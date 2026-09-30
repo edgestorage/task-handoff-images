@@ -9,6 +9,7 @@ TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。
 | `task-handoff-controlled-opencode` | Terminal、OpenCode |
 | `task-handoff-controlled-ai` | Terminal、Codex、Claude |
 | `task-handoff-controlled-webcap` | GUI Terminal、Browser、WebCap、Codex、Claude |
+| `task-handoff-controlled-bcap` | GUI Terminal、Browser、BCap、Codex、Claude |
 | `task-handoff-controlled-browser` | GUI Terminal、Browser、VS Code Web、Codex、Claude |
 
 这些镜像提供操作系统依赖、开发工具和 profile 元数据，不包含 TaskHandoff
@@ -30,7 +31,7 @@ volume，再启动该 runtime。
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
 ```
 
-支持 `codex`、`obscura`、`opencode`、`ai`、`webcap` 和 `browser`。
+支持 `codex`、`obscura`、`opencode`、`ai`、`webcap`、`bcap` 和 `browser`。
 `TASK_HANDOFF_IMAGE_REF` 可以覆盖本地镜像 tag。工具版本默认固定；其他版本
 构建参数只用于本地测试。
 

@@ -25,12 +25,16 @@ case "${IMAGE_PROFILE}" in
     BUILD_TARGET="profile-webcap"
     DEFAULT_IMAGE_REF="task-handoff-controlled-webcap:local"
     ;;
+  bcap)
+    BUILD_TARGET="profile-bcap"
+    DEFAULT_IMAGE_REF="task-handoff-controlled-bcap:local"
+    ;;
   browser)
     BUILD_TARGET="profile-browser"
     DEFAULT_IMAGE_REF="task-handoff-controlled-browser:local"
     ;;
   *)
-    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected codex, obscura, opencode, ai, webcap, or browser)" >&2
+    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected codex, obscura, opencode, ai, webcap, bcap, or browser)" >&2
     exit 1
     ;;
 esac
@@ -63,6 +67,8 @@ set -- \
   --build-arg "WEB_CAPABILITY_VERSION=${WEB_CAPABILITY_VERSION:-0.0.7}" \
   --build-arg "WEB_CAP_EXTENSION_VERSION=${WEB_CAP_EXTENSION_VERSION:-0.0.7}" \
   --build-arg "WEB_CAP_EXTENSION_URL=${WEB_CAP_EXTENSION_URL:-}" \
+  --build-arg "BCAP_SKILL_REPOSITORY=${BCAP_SKILL_REPOSITORY:-https://github.com/edgestorage/bcap.git}" \
+  --build-arg "BCAP_SKILL_REF=${BCAP_SKILL_REF:-8df543022d4fb0f63106d6f72a1b0f149385ae48}" \
   --build-arg "TASK_HANDOFF_BUILD_ID=${BUILD_ID}" \
   --build-arg "TASK_HANDOFF_BUILT_AT=${BUILT_AT}" \
   --build-arg "TASK_HANDOFF_GIT_COMMIT=${GIT_COMMIT}" \

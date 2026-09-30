@@ -56,6 +56,16 @@
       "optionalApps": ["chromium", "terminal-tty", "gui-terminal"]
     },
     {
+      "profile": "bcap",
+      "id": "market_taskhandoff_bcap",
+      "slug": "bcap",
+      "name": "TaskHandoff BCap",
+      "description": "Browser automation runtime with BCap, Codex, Claude, Chromium, and VNC.",
+      "localizedDescriptions": { "zh-CN": "浏览器自动化运行环境，包含 BCap、Codex、Claude、Chromium 和 VNC。" },
+      "capabilities": ["terminal", "gui-terminal", "browser", "bcap", "codex", "claude"],
+      "optionalApps": ["chromium", "terminal-tty", "gui-terminal"]
+    },
+    {
       "profile": "browser",
       "id": "market_taskhandoff_browser",
       "slug": "browser",

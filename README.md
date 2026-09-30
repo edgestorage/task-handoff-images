@@ -10,6 +10,7 @@ The repository builds six profiles from shared layers:
 | `task-handoff-controlled-opencode` | Terminal and OpenCode |
 | `task-handoff-controlled-ai` | Terminal, Codex, and Claude |
 | `task-handoff-controlled-webcap` | GUI terminal, browser, WebCap, Codex, and Claude |
+| `task-handoff-controlled-bcap` | GUI terminal, browser, BCap, Codex, and Claude |
 | `task-handoff-controlled-browser` | GUI terminal, browser, VS Code Web, Codex, and Claude |
 
 These images provide operating-system packages, developer tools, and profile
@@ -32,8 +33,8 @@ Select another profile with `TASK_HANDOFF_IMAGE_PROFILE`:
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
 ```
 
-Supported values are `codex`, `obscura`, `opencode`, `ai`, `webcap`, and
-`browser`.
+Supported values are `codex`, `obscura`, `opencode`, `ai`, `webcap`, `bcap`,
+and `browser`.
 `TASK_HANDOFF_IMAGE_REF` overrides the local image tag. Tool versions are
 pinned by default; override their build arguments only for local testing.
 

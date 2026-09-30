@@ -3,23 +3,25 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-export const ALL_PROFILES = ["codex", "obscura", "opencode", "ai", "webcap", "browser"];
+export const ALL_PROFILES = ["codex", "obscura", "opencode", "ai", "webcap", "bcap", "browser"];
 
 const STAGE_PROFILES = new Map([
   ["runtime-base", ALL_PROFILES],
   ["runtime-core", ALL_PROFILES],
-  ["profile-codex-root", ["codex", "obscura", "ai", "webcap", "browser"]],
+  ["profile-codex-root", ["codex", "obscura", "ai", "webcap", "bcap", "browser"]],
   ["profile-obscura-root", ["obscura"]],
   ["profile-opencode-root", ["opencode"]],
-  ["profile-ai-root", ["ai", "webcap", "browser"]],
-  ["profile-gui-root", ["webcap", "browser"]],
+  ["profile-ai-root", ["ai", "webcap", "bcap", "browser"]],
+  ["profile-gui-root", ["webcap", "bcap", "browser"]],
   ["profile-webcap-root", ["webcap"]],
+  ["profile-bcap-root", ["bcap"]],
   ["profile-browser-root", ["browser"]],
   ["profile-codex", ["codex"]],
   ["profile-obscura", ["obscura"]],
   ["profile-opencode", ["opencode"]],
   ["profile-ai", ["ai"]],
   ["profile-webcap", ["webcap"]],
+  ["profile-bcap", ["bcap"]],
   ["profile-browser", ["browser"]],
 ]);
 
@@ -77,7 +79,7 @@ export function profilesForPaths(paths) {
     if (path === ".dockerignore" || path === "docker/image-entrypoint.sh" || path === "docker/healthcheck.sh") {
       affected = ALL_PROFILES;
     } else if (path === "docker/optional-apps.sh") {
-      affected = ["webcap", "browser"];
+      affected = ["webcap", "bcap", "browser"];
     } else if (path === "LICENSE") {
       affected = ["obscura"];
     } else if (path.startsWith("docker/")) {

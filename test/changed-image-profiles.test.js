@@ -8,7 +8,7 @@ const resolverUrl = pathToFileURL(path.resolve(__dirname, "..", "scripts", "reso
 test("profile path changes select only dependent images", async () => {
   const { profilesForPaths } = await import(resolverUrl);
 
-  assert.deepEqual(profilesForPaths(["docker/optional-apps.sh"]), ["webcap", "browser"]);
+  assert.deepEqual(profilesForPaths(["docker/optional-apps.sh"]), ["webcap", "bcap", "browser"]);
   assert.deepEqual(profilesForPaths(["LICENSE"]), ["obscura"]);
   assert.deepEqual(profilesForPaths(["README.md", "test/dockerfile.test.js"]), []);
   assert.deepEqual(profilesForPaths(["docker/image-entrypoint.sh"]), [
@@ -17,6 +17,7 @@ test("profile path changes select only dependent images", async () => {
     "opencode",
     "ai",
     "webcap",
+    "bcap",
     "browser",
   ]);
 });
@@ -42,10 +43,10 @@ test("Dockerfile stage changes follow the image inheritance graph", async () => 
   );
   assert.deepEqual(
     profilesForDockerDiff(dockerfile, dockerfile, "@@ -4 +4 @@\n-RUN false\n+RUN true"),
-    ["codex", "obscura", "ai", "webcap", "browser"],
+    ["codex", "obscura", "ai", "webcap", "bcap", "browser"],
   );
   assert.deepEqual(
     profilesForDockerDiff(dockerfile, dockerfile, "@@ -2 +2 @@\n-RUN false\n+RUN true"),
-    ["codex", "obscura", "opencode", "ai", "webcap", "browser"],
+    ["codex", "obscura", "opencode", "ai", "webcap", "bcap", "browser"],
   );
 });

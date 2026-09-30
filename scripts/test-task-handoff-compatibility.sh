@@ -58,12 +58,13 @@ profile_capabilities() {
     opencode) echo "terminal,opencode" ;;
     ai) echo "terminal,codex,claude" ;;
     webcap) echo "terminal,gui-terminal,browser,web-cap,codex,claude" ;;
+    bcap) echo "terminal,gui-terminal,browser,bcap,codex,claude" ;;
     browser) echo "terminal,gui-terminal,browser,vscode-web,codex,claude" ;;
     *) return 1 ;;
   esac
 }
 
-readonly image_profiles="${TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap browser}"
+readonly image_profiles="${TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap bcap browser}"
 for profile in ${image_profiles}; do
   profile_capabilities "${profile}" >/dev/null
   safe_version="${version//./-}"

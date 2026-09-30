@@ -137,3 +137,27 @@ install_web_cap() {
   done
   chown -R agent:agent /home/agent/.agents /home/agent/.codex /home/agent/.claude
 }
+
+install_bcap() {
+  skill_source="${TASK_HANDOFF_BCAP_SKILL_DIR:-/tmp/task-handoff-bcap-skill}"
+
+  if [ ! -f "${skill_source}/SKILL.md" ]; then
+    echo "BCap skill source is missing." >&2
+    exit 1
+  fi
+  if [ ! -d "${skill_source}/node_modules" ]; then
+    (cd "${skill_source}" && npm_config_update_notifier=false npm install --omit=dev --no-audit --no-fund --loglevel=warn)
+  fi
+  node "${skill_source}/scripts/bcap.mjs" --help >/dev/null
+
+  for skills_dir in \
+    /home/agent/.agents/skills \
+    /home/agent/.codex/skills \
+    /home/agent/.claude/skills
+  do
+    rm -rf "${skills_dir}/bcap"
+    mkdir -p "${skills_dir}"
+    cp -R "${skill_source}" "${skills_dir}/bcap"
+  done
+  chown -R agent:agent /home/agent/.agents /home/agent/.codex /home/agent/.claude
+}

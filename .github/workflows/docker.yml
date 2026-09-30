@@ -32,6 +32,7 @@ env:
   DOCKERHUB_OPENCODE_IMAGE_NAME: ${{ vars.DOCKERHUB_OPENCODE_IMAGE_NAME || 'task-handoff-controlled-opencode' }}
   DOCKERHUB_AI_IMAGE_NAME: ${{ vars.DOCKERHUB_AI_IMAGE_NAME || 'task-handoff-controlled-ai' }}
   DOCKERHUB_WEBCAP_IMAGE_NAME: ${{ vars.DOCKERHUB_WEBCAP_IMAGE_NAME || 'task-handoff-controlled-webcap' }}
+  DOCKERHUB_BCAP_IMAGE_NAME: ${{ vars.DOCKERHUB_BCAP_IMAGE_NAME || 'task-handoff-controlled-bcap' }}
   DOCKERHUB_BROWSER_IMAGE_NAME: ${{ vars.DOCKERHUB_BROWSER_IMAGE_NAME || 'task-handoff-controlled-browser' }}
 
 jobs:
@@ -83,6 +84,7 @@ jobs:
               "opencode:${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
               "ai:${DOCKERHUB_AI_IMAGE_NAME}" \
               "webcap:${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
+              "bcap:${DOCKERHUB_BCAP_IMAGE_NAME}" \
               "browser:${DOCKERHUB_BROWSER_IMAGE_NAME}"
             do
               profile="${entry%%:*}"
@@ -93,13 +95,13 @@ jobs:
                 initial_profiles="$(node -e '
                   const profiles = new Set(JSON.parse(process.argv[1]));
                   profiles.add(process.argv[2]);
-                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "browser"];
+                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "bcap", "browser"];
                   process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
                 ' "$initial_profiles" "$profile")"
                 profiles="$(node -e '
                   const profiles = new Set(JSON.parse(process.argv[1]));
                   profiles.add(process.argv[2]);
-                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "browser"];
+                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "bcap", "browser"];
                   process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
                 ' "$profiles" "$profile")"
               fi
@@ -157,6 +159,7 @@ jobs:
           echo "opencode-image-ref=${DOCKERHUB_OPENCODE_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "ai-image-ref=${DOCKERHUB_AI_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "webcap-image-ref=${DOCKERHUB_WEBCAP_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
+          echo "bcap-image-ref=${DOCKERHUB_BCAP_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "browser-image-ref=${DOCKERHUB_BROWSER_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
@@ -251,6 +254,24 @@ jobs:
           cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
+      - name: Build BCap image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'bcap') }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          target: profile-bcap
+          tags: task-handoff-controlled-bcap:ci-${{ matrix.arch }}
+          build-args: |
+            TASK_HANDOFF_IMAGE_VERSION=${{ steps.image-version.outputs.value }}
+            TASK_HANDOFF_BUILD_ID=${{ github.run_id }}
+            TASK_HANDOFF_BUILT_AT=${{ github.event.repository.updated_at }}
+            TASK_HANDOFF_GIT_COMMIT=${{ github.sha }}
+            TASK_HANDOFF_IMAGE_REF=${{ steps.image-version.outputs.bcap-image-ref }}
+          cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
+
       - name: Build Browser image
         if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'browser') }}
         uses: docker/build-push-action@v7
@@ -341,6 +362,16 @@ jobs:
                 run_profile webcap codex claude chromium vncserver web-cap
                 ! docker exec task-handoff-webcap-ci sh -lc 'command -v code-server'
                 ;;
+              bcap)
+                run_profile bcap codex claude chromium vncserver
+                docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.codex/skills/bcap/SKILL.md'
+                docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.agents/skills/bcap/SKILL.md'
+                docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.claude/skills/bcap/SKILL.md'
+                docker exec task-handoff-bcap-ci sh -lc 'test -d /home/agent/.codex/skills/bcap/node_modules/playwright-core'
+                docker exec --user agent task-handoff-bcap-ci node /home/agent/.codex/skills/bcap/scripts/bcap.mjs --help >/dev/null
+                ! docker exec task-handoff-bcap-ci sh -lc 'command -v code-server'
+                ! docker exec task-handoff-bcap-ci sh -lc 'command -v web-cap'
+                ;;
               browser)
                 run_profile browser codex claude chromium vncserver code-server
                 ! docker exec task-handoff-browser-ci sh -lc 'command -v web-cap'
@@ -350,7 +381,7 @@ jobs:
 
       - name: Cleanup
         if: ${{ always() && matrix.arch == 'amd64' }}
-        run: docker rm -f task-handoff-codex-ci task-handoff-obscura-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-browser-ci 2>/dev/null || true
+        run: docker rm -f task-handoff-codex-ci task-handoff-obscura-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-bcap-ci task-handoff-browser-ci 2>/dev/null || true
 
       - name: Resolve published TaskHandoff compatibility versions
         if: ${{ matrix.arch == 'amd64' }}
@@ -392,6 +423,7 @@ jobs:
               opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
               ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
               webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              bcap) image_name="$DOCKERHUB_BCAP_IMAGE_NAME" ;;
               browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
             esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
@@ -431,6 +463,7 @@ jobs:
               opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
               ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
               webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              bcap) image_name="$DOCKERHUB_BCAP_IMAGE_NAME" ;;
               browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
             esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
@@ -494,6 +527,7 @@ jobs:
               opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
               ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
               webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              bcap) image_name="$DOCKERHUB_BCAP_IMAGE_NAME" ;;
               browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
             esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
@@ -510,6 +544,7 @@ jobs:
               opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
               ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
               webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              bcap) image_name="$DOCKERHUB_BCAP_IMAGE_NAME" ;;
               browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
             esac
             image="${DOCKERHUB_USERNAME}/${image_name}"

@@ -27,10 +27,10 @@ test("Docker profiles run as agent with passwordless container-root escalation",
   assert.match(dockerfile, /printf 'agent ALL=\(root\) NOPASSWD: ALL\\n' > \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /chmod 0440 \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /visudo -cf \/etc\/sudoers\.d\/task-handoff-agent/);
-  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 6);
+  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 7);
 });
 
-test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, and Browser image profiles from shared layers", () => {
+test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, BCap, and Browser image profiles from shared layers", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
 
@@ -40,6 +40,7 @@ test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, and Browser image pro
   assert.match(dockerfile, /FROM profile-codex-root AS profile-ai-root/);
   assert.match(dockerfile, /FROM profile-ai-root AS profile-gui-root/);
   assert.match(dockerfile, /FROM profile-gui-root AS profile-webcap-root/);
+  assert.match(dockerfile, /FROM profile-gui-root AS profile-bcap-root/);
   assert.match(dockerfile, /FROM profile-gui-root AS profile-browser-root/);
   assert.doesNotMatch(dockerfile, /ENV TASK_HANDOFF_IMAGE_(?:PROFILE|CAPABILITIES)=/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex/);
@@ -47,13 +48,34 @@ test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, and Browser image pro
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,opencode/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,web-cap,codex,claude/);
+  assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,bcap,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,vscode-web,codex,claude/);
   assert.match(dockerfile, /ARG CODEX_CLI_PACKAGE=@openai\/codex@\d+\.\d+\.\d+/);
   assert.match(dockerfile, /ARG OPENCODE_CLI_PACKAGE=opencode-ai@\d+\.\d+\.\d+[\s\S]*npm install -g[\s\S]*"\$OPENCODE_CLI_PACKAGE"[\s\S]*opencode --version/);
   assert.match(buildScript, /opencode\)\n\s+BUILD_TARGET="profile-opencode"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-opencode:local"/);
   assert.match(buildScript, /obscura\)\n\s+BUILD_TARGET="profile-obscura"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"/);
+  assert.match(buildScript, /bcap\)\n\s+BUILD_TARGET="profile-bcap"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-bcap:local"/);
   assert.match(buildScript, /CODEX_CLI_PACKAGE=\$\{CODEX_CLI_PACKAGE:-@openai\/codex@\d+\.\d+\.\d+\}/);
   assert.match(buildScript, /OPENCODE_CLI_PACKAGE=\$\{OPENCODE_CLI_PACKAGE:-opencode-ai@\d+\.\d+\.\d+\}/);
+});
+
+test("Docker BCap profile installs the pinned bcap skill on the chromium base", () => {
+  const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
+  const optionalApps = fs.readFileSync(path.join(root, "docker", "optional-apps.sh"), "utf8");
+  const bcapRootStart = dockerfile.indexOf("FROM profile-gui-root AS profile-bcap-root");
+  const browserRootStart = dockerfile.indexOf("FROM profile-gui-root AS profile-browser-root");
+
+  assert.ok(bcapRootStart >= 0 && browserRootStart > bcapRootStart);
+  const bcapRoot = dockerfile.slice(bcapRootStart, browserRootStart);
+  assert.match(bcapRoot, /ARG BCAP_SKILL_REPOSITORY=https:\/\/github\.com\/edgestorage\/bcap\.git/);
+  assert.match(bcapRoot, /ARG BCAP_SKILL_REF=[a-f0-9]{40}/);
+  assert.match(bcapRoot, /fetch --depth 1 origin "\$\{BCAP_SKILL_REF\}"/);
+  assert.match(bcapRoot, /test -f \/tmp\/task-handoff-bcap-source\/SKILL\.md/);
+  assert.match(bcapRoot, /install_bcap/);
+  assert.doesNotMatch(bcapRoot, /code-server|install_web_cap/);
+  assert.doesNotMatch(dockerfile, /TASK_HANDOFF_ENABLE_BCAP/);
+
+  assert.match(optionalApps, /install_bcap\(\) \{[\s\S]*npm install --omit=dev --no-audit --no-fund[\s\S]*scripts\/bcap\.mjs" --help[\s\S]*\.agents\/skills[\s\S]*\.codex\/skills[\s\S]*\.claude\/skills[\s\S]*chown -R agent:agent/);
 });
 
 test("Docker installs pinned Obscura release binaries for amd64 and arm64", () => {
@@ -127,6 +149,7 @@ test("Docker CI builds amd64 and arm64 concurrently and publishes a multi-archit
   assert.match(workflow, /target: profile-opencode/);
   assert.match(workflow, /target: profile-ai/);
   assert.match(workflow, /target: profile-webcap/);
+  assert.match(workflow, /target: profile-bcap/);
   assert.match(workflow, /target: profile-browser/);
   assert.match(workflow, /run_profile obscura codex obscura obscura-worker/);
   assert.match(workflow, /docker exec task-handoff-obscura-ci obscura --version/);
@@ -161,6 +184,7 @@ test("Release tags inject the repository version into Docker images", () => {
   assert.match(workflow, /opencode-image-ref=\$\{DOCKERHUB_OPENCODE_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /ai-image-ref=\$\{DOCKERHUB_AI_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /webcap-image-ref=\$\{DOCKERHUB_WEBCAP_IMAGE_NAME\}:\$\{tag\}/);
+  assert.match(workflow, /bcap-image-ref=\$\{DOCKERHUB_BCAP_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /browser-image-ref=\$\{DOCKERHUB_BROWSER_IMAGE_NAME\}:\$\{tag\}/);
   assert.doesNotMatch(workflow, /require\('\.\/package\.json'\)\.version/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_VERSION=\$\{\{ steps\.image-version\.outputs\.value \}\}/);
@@ -169,6 +193,7 @@ test("Release tags inject the repository version into Docker images", () => {
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.opencode-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.ai-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.webcap-image-ref \}\}/);
+  assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.bcap-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.browser-image-ref \}\}/);
   assert.match(workflow, /Verify image metadata[\s\S]*org\.opencontainers\.image\.version[\s\S]*EXPECTED_VERSION/);
   assert.match(workflow, /controlled-instance absence/);
@@ -226,7 +251,7 @@ test("Docker publication is gated by current and N-1 published TaskHandoff runti
   assert.match(resolver, /\{ channel: "current", version: latest \}/);
   assert.match(resolver, /\{ channel: "n-1", version: stableVersions\[latestIndex - 1\] \}/);
   assert.match(compatibility, /npm install[\s\S]*"@task-handoff\/node-agent@\$\{version\}"/);
-  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap browser/);
+  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap bcap browser/);
   assert.match(compatibility, /runtime-installer\.mjs install/);
   assert.match(compatibility, /docker restart/);
   assert.match(compatibility, /\/api\/health/);

@@ -200,6 +200,21 @@ RUN set -eux; \
   . /tmp/task-handoff-optional-apps.sh; \
   install_web_cap
 
+FROM profile-gui-root AS profile-bcap-root
+ARG BCAP_SKILL_REPOSITORY=https://github.com/edgestorage/bcap.git
+ARG BCAP_SKILL_REF=8df543022d4fb0f63106d6f72a1b0f149385ae48
+RUN set -eux; \
+  git init /tmp/task-handoff-bcap-source; \
+  git -C /tmp/task-handoff-bcap-source remote add origin "${BCAP_SKILL_REPOSITORY}"; \
+  git -C /tmp/task-handoff-bcap-source fetch --depth 1 origin "${BCAP_SKILL_REF}"; \
+  git -C /tmp/task-handoff-bcap-source checkout --detach FETCH_HEAD; \
+  test -f /tmp/task-handoff-bcap-source/SKILL.md; \
+  rm -rf /tmp/task-handoff-bcap-source/.git; \
+  rm -rf /tmp/task-handoff-bcap-skill; \
+  mv /tmp/task-handoff-bcap-source /tmp/task-handoff-bcap-skill; \
+  . /tmp/task-handoff-optional-apps.sh; \
+  install_bcap
+
 FROM profile-gui-root AS profile-browser-root
 ARG CODE_SERVER_VERSION=4.125.0
 RUN set -eux; \
@@ -308,6 +323,26 @@ ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
 ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
 LABEL io.task-handoff.image.profile=webcap
 LABEL io.task-handoff.image.capabilities=terminal,gui-terminal,browser,web-cap,codex,claude
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
+FROM profile-bcap-root AS profile-bcap
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-bcap:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=bcap
+LABEL io.task-handoff.image.capabilities=terminal,gui-terminal,browser,bcap,codex,claude
 
 USER agent
 EXPOSE 8080
