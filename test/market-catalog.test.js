@@ -258,7 +258,7 @@ test("Pages workflows deploy the catalog through the shared action", () => {
   const pagesWorkflow = fs.readFileSync(path.join(root, ".github", "workflows", "pages.yml"), "utf8");
   const action = fs.readFileSync(path.join(root, ".github", "actions", "publish-market-catalog", "action.yml"), "utf8");
 
-  assert.match(workflow, /publish-market-catalog:[\s\S]*needs: \[detect-changes, promote-release\]/);
+  assert.match(workflow, /publish-market-catalog:[\s\S]*needs: promote-release/);
   assert.match(workflow, /uses: \.\/\.github\/actions\/publish-market-catalog/);
   assert.match(workflow, /pages: write/);
   assert.match(pagesWorkflow, /workflow_dispatch:/);
