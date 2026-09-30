@@ -390,3 +390,30 @@ jobs:
             docker buildx imagetools create --prefer-index=false "${tags[@]}" "$source"
             docker buildx imagetools inspect "${image}:${version}"
           done
+
+  publish-market-catalog:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
+    needs: [detect-changes, promote-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: market-catalog-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate and deploy market catalog
+        id: publish
+        uses: ./.github/actions/publish-market-catalog
+        with:
+          namespace: ${{ secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
+          signing-key: ${{ secrets.TASK_HANDOFF_CATALOG_SIGNING_KEY }}
+          signing-key-id: ${{ vars.TASK_HANDOFF_CATALOG_SIGNING_KEY_ID }}

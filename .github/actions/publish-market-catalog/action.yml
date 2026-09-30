@@ -1,0 +1,66 @@
+name: Publish market catalog
+description: Generate the TaskHandoff image market catalog and deploy it to GitHub Pages.
+
+inputs:
+  namespace:
+    description: Registry namespace that owns the controlled-instance images.
+    required: true
+  token:
+    description: Registry access token used to avoid anonymous API rate limits.
+    required: false
+  registry:
+    description: Container registry host.
+    required: false
+    default: docker.io
+  output-dir:
+    description: Directory that receives the generated Pages site.
+    required: false
+    default: pages-dist
+  signing-key:
+    description: Optional ed25519 private key (PEM, base64 PKCS#8, or file path) for catalog signing.
+    required: false
+  signing-key-id:
+    description: Signing key identifier embedded in catalog.sig.
+    required: false
+    default: task-handoff-market-1
+
+outputs:
+  page_url:
+    description: URL of the deployed Pages site.
+    value: ${{ steps.deployment.outputs.page_url }}
+  revision:
+    description: Catalog revision written by the generator.
+    value: ${{ steps.generate.outputs.revision }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate market catalog
+      id: generate
+      shell: bash
+      env:
+        DOCKERHUB_USERNAME: ${{ inputs.namespace }}
+        DOCKERHUB_TOKEN: ${{ inputs.token }}
+        TASK_HANDOFF_MARKET_NAMESPACE: ${{ inputs.namespace }}
+        TASK_HANDOFF_MARKET_REGISTRY: ${{ inputs.registry }}
+        TASK_HANDOFF_GIT_COMMIT: ${{ github.sha }}
+        TASK_HANDOFF_CATALOG_SIGNING_KEY: ${{ inputs.signing-key }}
+        TASK_HANDOFF_CATALOG_SIGNING_KEY_ID: ${{ inputs.signing-key-id }}
+      run: |
+        set -euo pipefail
+        node scripts/build-market-catalog.mjs \
+          --out "${{ inputs.output-dir }}" \
+          --namespace "${{ inputs.namespace }}" \
+          --registry "${{ inputs.registry }}"
+        revision="$(node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).revision)' "${{ inputs.output-dir }}/market/v1/catalog.json")"
+        echo "revision=${revision}" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/configure-pages@v5
+
+    - uses: actions/upload-pages-artifact@v3
+      with:
+        path: ${{ inputs.output-dir }}
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4

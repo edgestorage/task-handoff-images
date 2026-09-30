@@ -1,0 +1,69 @@
+{
+  "protocolVersion": "2026-07-29",
+  "catalogId": "task_handoff_market",
+  "publisher": "task-handoff",
+  "siteDomain": "images.thandoff.com",
+  "historyTagLimit": 6,
+  "profiles": [
+    {
+      "profile": "codex",
+      "id": "market_taskhandoff_codex",
+      "slug": "codex",
+      "name": "TaskHandoff Codex",
+      "description": "Minimal Codex runtime with terminal and Codex.",
+      "localizedDescriptions": { "zh-CN": "最小 Codex 运行环境，包含终端和 Codex。" },
+      "capabilities": ["terminal", "codex"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "obscura",
+      "id": "market_taskhandoff_obscura",
+      "slug": "obscura",
+      "name": "TaskHandoff Obscura",
+      "description": "Codex runtime with terminal, Codex, and Obscura.",
+      "localizedDescriptions": { "zh-CN": "包含终端、Codex 和 Obscura 的运行环境。" },
+      "capabilities": ["terminal", "codex", "obscura"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "opencode",
+      "id": "market_taskhandoff_opencode",
+      "slug": "opencode",
+      "name": "TaskHandoff OpenCode",
+      "description": "Minimal OpenCode runtime with terminal and OpenCode.",
+      "localizedDescriptions": { "zh-CN": "最小 OpenCode 运行环境，包含终端和 OpenCode。" },
+      "capabilities": ["terminal", "opencode"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "ai",
+      "id": "market_taskhandoff_ai",
+      "slug": "ai",
+      "name": "TaskHandoff Codex + Claude",
+      "description": "AI development runtime with Codex, Claude, and terminal.",
+      "localizedDescriptions": { "zh-CN": "AI 开发运行环境，包含 Codex、Claude 和终端。" },
+      "capabilities": ["terminal", "codex", "claude"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "webcap",
+      "id": "market_taskhandoff_webcap",
+      "slug": "webcap",
+      "name": "TaskHandoff WebCap",
+      "description": "Browser automation runtime with WebCap, Codex, Claude, Chromium, and VNC.",
+      "localizedDescriptions": { "zh-CN": "浏览器自动化运行环境，包含 WebCap、Codex、Claude、Chromium 和 VNC。" },
+      "capabilities": ["terminal", "gui-terminal", "browser", "web-cap", "codex", "claude"],
+      "optionalApps": ["chromium", "terminal-tty", "gui-terminal"]
+    },
+    {
+      "profile": "browser",
+      "id": "market_taskhandoff_browser",
+      "slug": "browser",
+      "name": "TaskHandoff Browser",
+      "description": "Full runtime with Codex, Claude, Chromium, VNC, and code-server.",
+      "localizedDescriptions": { "zh-CN": "完整运行环境，包含 Codex、Claude、Chromium、VNC 和 code-server。" },
+      "capabilities": ["terminal", "gui-terminal", "browser", "vscode-web", "codex", "claude"],
+      "optionalApps": ["chromium", "terminal-tty", "gui-terminal", "vscode-web"]
+    }
+  ]
+}

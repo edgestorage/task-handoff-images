@@ -1,0 +1,43 @@
+name: Market Catalog Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: "Registry namespace that owns the controlled-instance images"
+        required: false
+        type: string
+      registry:
+        description: "Container registry host"
+        required: false
+        default: docker.io
+        type: string
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: market-catalog-pages
+  cancel-in-progress: false
+
+jobs:
+  publish-market-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Generate and deploy market catalog
+        id: publish
+        uses: ./.github/actions/publish-market-catalog
+        with:
+          namespace: ${{ inputs.namespace || secrets.DOCKERHUB_USERNAME }}
+          token: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ inputs.registry || 'docker.io' }}
+          signing-key: ${{ secrets.TASK_HANDOFF_CATALOG_SIGNING_KEY }}
+          signing-key-id: ${{ vars.TASK_HANDOFF_CATALOG_SIGNING_KEY_ID }}
