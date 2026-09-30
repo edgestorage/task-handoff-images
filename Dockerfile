@@ -79,6 +79,27 @@ ARG CODEX_CLI_PACKAGE=@openai/codex@0.153.4
 RUN npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$CODEX_CLI_PACKAGE" \
   && codex --version
 
+FROM profile-codex-root AS profile-obscura-root
+ARG TARGETOS
+ARG TARGETARCH
+ARG OBSCURA_VERSION=0.2.3
+ARG OBSCURA_AMD64_SHA256=1534d1e6ddaf3d080ec4091eb41d0a4d8cc042a48b607d3c410fc13b482a9eec
+ARG OBSCURA_ARM64_SHA256=5ecf980bca3060236a7a86ec7ed83d943e6598ee87caa46d20325d90bc75f979
+COPY LICENSE /usr/share/doc/obscura/LICENSE
+RUN set -eux; \
+  case "${TARGETOS:-linux}-${TARGETARCH:-amd64}" in \
+    linux-amd64) obscura_arch="x86_64"; obscura_sha256="${OBSCURA_AMD64_SHA256}" ;; \
+    linux-arm64) obscura_arch="aarch64"; obscura_sha256="${OBSCURA_ARM64_SHA256}" ;; \
+    *) echo "Unsupported Obscura Docker target: ${TARGETOS:-linux}-${TARGETARCH:-amd64}" >&2; exit 1 ;; \
+  esac; \
+  obscura_archive="/tmp/obscura-${obscura_arch}-linux.tar.gz"; \
+  curl -fsSL -o "${obscura_archive}" \
+    "https://github.com/h4ckf0r0day/obscura/releases/download/v${OBSCURA_VERSION}/obscura-${obscura_arch}-linux.tar.gz"; \
+  echo "${obscura_sha256}  ${obscura_archive}" | sha256sum -c -; \
+  tar -xzf "${obscura_archive}" -C /usr/local/bin obscura obscura-worker; \
+  rm -f "${obscura_archive}"; \
+  obscura --version
+
 FROM runtime-core AS profile-opencode-root
 ARG OPENCODE_CLI_PACKAGE=opencode-ai@1.18.29
 RUN npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$OPENCODE_CLI_PACKAGE" \
@@ -207,6 +228,26 @@ ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
 ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
 LABEL io.task-handoff.image.profile=codex
 LABEL io.task-handoff.image.capabilities=terminal,codex
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
+FROM profile-obscura-root AS profile-obscura
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-obscura:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=obscura
+LABEL io.task-handoff.image.capabilities=terminal,codex,obscura
 
 USER agent
 EXPOSE 8080

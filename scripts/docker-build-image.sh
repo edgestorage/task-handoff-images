@@ -9,6 +9,10 @@ case "${IMAGE_PROFILE}" in
     BUILD_TARGET="profile-codex"
     DEFAULT_IMAGE_REF="task-handoff-controlled-codex:local"
     ;;
+  obscura)
+    BUILD_TARGET="profile-obscura"
+    DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"
+    ;;
   opencode)
     BUILD_TARGET="profile-opencode"
     DEFAULT_IMAGE_REF="task-handoff-controlled-opencode:local"
@@ -26,7 +30,7 @@ case "${IMAGE_PROFILE}" in
     DEFAULT_IMAGE_REF="task-handoff-controlled-browser:local"
     ;;
   *)
-    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected codex, opencode, ai, webcap, or browser)" >&2
+    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected codex, obscura, opencode, ai, webcap, or browser)" >&2
     exit 1
     ;;
 esac
@@ -44,6 +48,9 @@ set -- \
   --tag "${IMAGE_REF}" \
   --build-arg "TASK_HANDOFF_IMAGE_VERSION=${IMAGE_VERSION}" \
   --build-arg "CODEX_CLI_PACKAGE=${CODEX_CLI_PACKAGE:-@openai/codex@0.153.4}" \
+  --build-arg "OBSCURA_VERSION=${OBSCURA_VERSION:-0.2.3}" \
+  --build-arg "OBSCURA_AMD64_SHA256=${OBSCURA_AMD64_SHA256:-1534d1e6ddaf3d080ec4091eb41d0a4d8cc042a48b607d3c410fc13b482a9eec}" \
+  --build-arg "OBSCURA_ARM64_SHA256=${OBSCURA_ARM64_SHA256:-5ecf980bca3060236a7a86ec7ed83d943e6598ee87caa46d20325d90bc75f979}" \
   --build-arg "OPENCODE_CLI_PACKAGE=${OPENCODE_CLI_PACKAGE:-opencode-ai@1.18.29}" \
   --build-arg "CLAUDE_CODE_VERSION=${CLAUDE_CODE_VERSION:-2.1.183}" \
   --build-arg "TASK_HANDOFF_ENABLE_CC_SWITCH=${TASK_HANDOFF_ENABLE_CC_SWITCH:-0}" \

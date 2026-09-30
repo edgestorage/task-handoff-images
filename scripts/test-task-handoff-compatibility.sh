@@ -54,6 +54,7 @@ test "${runtime_identity[0]}" = "${version}"
 profile_capabilities() {
   case "$1" in
     codex) echo "terminal,codex" ;;
+    obscura) echo "terminal,codex,obscura" ;;
     opencode) echo "terminal,opencode" ;;
     ai) echo "terminal,codex,claude" ;;
     webcap) echo "terminal,gui-terminal,browser,web-cap,codex,claude" ;;
@@ -62,7 +63,9 @@ profile_capabilities() {
   esac
 }
 
-for profile in codex opencode ai webcap browser; do
+readonly image_profiles="${TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap browser}"
+for profile in ${image_profiles}; do
+  profile_capabilities "${profile}" >/dev/null
   safe_version="${version//./-}"
   name="task-handoff-compat-${profile}-${safe_version}"
   data_volume="${name}-data"

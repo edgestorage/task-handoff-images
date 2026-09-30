@@ -1,10 +1,11 @@
 # TaskHandoff Images
 
-TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。本仓库从共享分层构建五个 profile：
+TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。本仓库从共享分层构建六个 profile：
 
 | 镜像 | 能力 |
 | --- | --- |
 | `task-handoff-controlled-codex` | Terminal、Codex |
+| `task-handoff-controlled-obscura` | Terminal、Codex、Obscura |
 | `task-handoff-controlled-opencode` | Terminal、OpenCode |
 | `task-handoff-controlled-ai` | Terminal、Codex、Claude |
 | `task-handoff-controlled-webcap` | GUI Terminal、Browser、WebCap、Codex、Claude |

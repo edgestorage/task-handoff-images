@@ -27,14 +27,15 @@ test("Docker profiles run as agent with passwordless container-root escalation",
   assert.match(dockerfile, /printf 'agent ALL=\(root\) NOPASSWD: ALL\\n' > \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /chmod 0440 \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /visudo -cf \/etc\/sudoers\.d\/task-handoff-agent/);
-  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 5);
+  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 6);
 });
 
-test("Docker exports Codex, OpenCode, AI, WebCap, and Browser image profiles from shared layers", () => {
+test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, and Browser image profiles from shared layers", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
 
   assert.match(dockerfile, /FROM runtime-core AS profile-codex-root/);
+  assert.match(dockerfile, /FROM profile-codex-root AS profile-obscura-root/);
   assert.match(dockerfile, /FROM runtime-core AS profile-opencode-root/);
   assert.match(dockerfile, /FROM profile-codex-root AS profile-ai-root/);
   assert.match(dockerfile, /FROM profile-ai-root AS profile-gui-root/);
@@ -42,6 +43,7 @@ test("Docker exports Codex, OpenCode, AI, WebCap, and Browser image profiles fro
   assert.match(dockerfile, /FROM profile-gui-root AS profile-browser-root/);
   assert.doesNotMatch(dockerfile, /ENV TASK_HANDOFF_IMAGE_(?:PROFILE|CAPABILITIES)=/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex/);
+  assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,obscura/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,opencode/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,web-cap,codex,claude/);
@@ -49,8 +51,26 @@ test("Docker exports Codex, OpenCode, AI, WebCap, and Browser image profiles fro
   assert.match(dockerfile, /ARG CODEX_CLI_PACKAGE=@openai\/codex@\d+\.\d+\.\d+/);
   assert.match(dockerfile, /ARG OPENCODE_CLI_PACKAGE=opencode-ai@\d+\.\d+\.\d+[\s\S]*npm install -g[\s\S]*"\$OPENCODE_CLI_PACKAGE"[\s\S]*opencode --version/);
   assert.match(buildScript, /opencode\)\n\s+BUILD_TARGET="profile-opencode"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-opencode:local"/);
+  assert.match(buildScript, /obscura\)\n\s+BUILD_TARGET="profile-obscura"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"/);
   assert.match(buildScript, /CODEX_CLI_PACKAGE=\$\{CODEX_CLI_PACKAGE:-@openai\/codex@\d+\.\d+\.\d+\}/);
   assert.match(buildScript, /OPENCODE_CLI_PACKAGE=\$\{OPENCODE_CLI_PACKAGE:-opencode-ai@\d+\.\d+\.\d+\}/);
+});
+
+test("Docker installs pinned Obscura release binaries for amd64 and arm64", () => {
+  const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
+  const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
+
+  assert.match(dockerfile, /ARG OBSCURA_VERSION=\d+\.\d+\.\d+/);
+  assert.match(dockerfile, /ARG OBSCURA_AMD64_SHA256=[a-f0-9]{64}/);
+  assert.match(dockerfile, /ARG OBSCURA_ARM64_SHA256=[a-f0-9]{64}/);
+  assert.match(dockerfile, /COPY LICENSE \/usr\/share\/doc\/obscura\/LICENSE/);
+  assert.match(dockerfile, /linux-amd64\) obscura_arch="x86_64"/);
+  assert.match(dockerfile, /linux-arm64\) obscura_arch="aarch64"/);
+  assert.match(dockerfile, /releases\/download\/v\$\{OBSCURA_VERSION\}\/obscura-\$\{obscura_arch\}-linux\.tar\.gz/);
+  assert.match(dockerfile, /sha256sum -c -/);
+  assert.match(dockerfile, /tar -xzf "\$\{obscura_archive\}" -C \/usr\/local\/bin obscura obscura-worker/);
+  assert.match(dockerfile, /obscura --version/);
+  assert.match(buildScript, /OBSCURA_VERSION=\$\{OBSCURA_VERSION:-\d+\.\d+\.\d+\}/);
 });
 
 test("Docker WebCap profile installs WebCap without code-server", () => {
@@ -103,10 +123,13 @@ test("Docker CI builds amd64 and arm64 concurrently and publishes a multi-archit
   assert.doesNotMatch(workflow, /docker\/setup-qemu-action/);
   assert.match(workflow, /scope=docker-image-\$\{\{ matrix\.arch \}\}/);
   assert.match(workflow, /target: profile-codex/);
+  assert.match(workflow, /target: profile-obscura/);
   assert.match(workflow, /target: profile-opencode/);
   assert.match(workflow, /target: profile-ai/);
   assert.match(workflow, /target: profile-webcap/);
   assert.match(workflow, /target: profile-browser/);
+  assert.match(workflow, /run_profile obscura codex obscura obscura-worker/);
+  assert.match(workflow, /docker exec task-handoff-obscura-ci obscura --version/);
   assert.match(workflow, /sha_tag="docker-sha-\$\{GITHUB_SHA\}-\$\{\{ matrix\.arch \}\}"/);
   assert.match(workflow, /"\$\{image\}:\$\{sha_tag\}-amd64"/);
   assert.match(workflow, /"\$\{image\}:\$\{sha_tag\}-arm64"/);
@@ -115,7 +138,7 @@ test("Docker CI builds amd64 and arm64 concurrently and publishes a multi-archit
   assert.doesNotMatch(workflow, /branches:\s*\n\s+- main/);
   assert.doesNotMatch(workflow, /refs\/heads\/main/);
   assert.match(workflow, /Publish immutable commit image\n\s+if: \$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \|\| inputs\.image_version != '' \}\}/);
-  assert.match(workflow, /promote-release:\n\s+if:.*refs\/tags\/v.*\n\s+needs: publish-multiarch-image/);
+  assert.match(workflow, /promote-release:\n\s+if:.*refs\/tags\/v.*\n\s+needs: \[detect-changes, publish-multiarch-image\]/);
   assert.match(workflow, /REQUESTED_IMAGE_VERSION: \$\{\{ inputs\.image_version \}\}/);
   assert.match(workflow, /version="v\$\{REQUESTED_IMAGE_VERSION\}"/);
   assert.match(workflow, /release_version="\$\{version#v\}"/);
@@ -134,6 +157,7 @@ test("Release tags inject the repository version into Docker images", () => {
   assert.match(workflow, /REQUESTED_IMAGE_VERSION: \$\{\{ inputs\.image_version \}\}/);
   assert.match(workflow, /elif \[\[ -n "\$\{REQUESTED_IMAGE_VERSION\}" \]\]; then/);
   assert.match(workflow, /codex-image-ref=\$\{DOCKERHUB_CODEX_IMAGE_NAME\}:\$\{tag\}/);
+  assert.match(workflow, /obscura-image-ref=\$\{DOCKERHUB_OBSCURA_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /opencode-image-ref=\$\{DOCKERHUB_OPENCODE_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /ai-image-ref=\$\{DOCKERHUB_AI_IMAGE_NAME\}:\$\{tag\}/);
   assert.match(workflow, /webcap-image-ref=\$\{DOCKERHUB_WEBCAP_IMAGE_NAME\}:\$\{tag\}/);
@@ -141,6 +165,7 @@ test("Release tags inject the repository version into Docker images", () => {
   assert.doesNotMatch(workflow, /require\('\.\/package\.json'\)\.version/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_VERSION=\$\{\{ steps\.image-version\.outputs\.value \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.codex-image-ref \}\}/);
+  assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.obscura-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.opencode-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.ai-image-ref \}\}/);
   assert.match(workflow, /TASK_HANDOFF_IMAGE_REF=\$\{\{ steps\.image-version\.outputs\.webcap-image-ref \}\}/);
@@ -173,7 +198,20 @@ test("Docker installs Claude Code through the same canonical package managed at 
 
 test("Docker workflow runs repository contract tests", () => {
   const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "docker.yml"), "utf8");
-  assert.match(workflow, /node --test test\/dockerfile\.test\.js/);
+  assert.match(workflow, /detect-changes:[\s\S]*node --test test\/\*\.test\.js/);
+});
+
+test("Docker workflow builds and publishes only affected image profiles", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "docker.yml"), "utf8");
+
+  assert.match(workflow, /fetch-depth: 0/);
+  assert.match(workflow, /resolve-changed-image-profiles\.mjs --base "\$base" --head "\$GITHUB_SHA"/);
+  assert.match(workflow, /git describe --tags --abbrev=0 "\$\{GITHUB_SHA\}\^"/);
+  assert.match(workflow, /No latest tag found for \$\{image\}; scheduling its initial build/);
+  assert.match(workflow, /if: \$\{\{ contains\(fromJSON\(needs\.detect-changes\.outputs\.profiles\), 'obscura'\) \}\}[\s\S]*target: profile-obscura/);
+  assert.match(workflow, /TASK_HANDOFF_IMAGE_PROFILES: \$\{\{ needs\.detect-changes\.outputs\.profiles_space \}\}/);
+  assert.match(workflow, /mapfile -t profiles < <\(node -e[\s\S]*needs\.detect-changes\.outputs\.profiles/);
+  assert.match(workflow, /initial_profiles[\s\S]*tags\+=\(--tag "\$\{image\}:latest"\)/);
 });
 
 test("Docker publication is gated by current and N-1 published TaskHandoff runtimes", () => {
@@ -183,11 +221,12 @@ test("Docker publication is gated by current and N-1 published TaskHandoff runti
 
   assert.match(workflow, /Resolve published TaskHandoff compatibility versions/);
   assert.match(workflow, /Test current and N-1 TaskHandoff compatibility/);
-  assert.ok(workflow.indexOf("Test current and N-1 TaskHandoff compatibility") < workflow.indexOf("Login to Docker Hub"));
+  assert.ok(workflow.indexOf("Test current and N-1 TaskHandoff compatibility") < workflow.indexOf("Publish immutable commit image"));
   assert.match(resolver, /"@task-handoff\/node-agent"/);
   assert.match(resolver, /\{ channel: "current", version: latest \}/);
   assert.match(resolver, /\{ channel: "n-1", version: stableVersions\[latestIndex - 1\] \}/);
   assert.match(compatibility, /npm install[\s\S]*"@task-handoff\/node-agent@\$\{version\}"/);
+  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap browser/);
   assert.match(compatibility, /runtime-installer\.mjs install/);
   assert.match(compatibility, /docker restart/);
   assert.match(compatibility, /\/api\/health/);

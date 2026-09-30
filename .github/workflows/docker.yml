@@ -8,7 +8,7 @@ on:
       - ".dockerignore"
       - "docker/**"
       - "test/**"
-      - "scripts/docker-build-image.sh"
+      - "scripts/**"
   push:
     tags:
       - "v*"
@@ -28,13 +28,95 @@ concurrency:
 
 env:
   DOCKERHUB_CODEX_IMAGE_NAME: ${{ vars.DOCKERHUB_CODEX_IMAGE_NAME || 'task-handoff-controlled-codex' }}
+  DOCKERHUB_OBSCURA_IMAGE_NAME: ${{ vars.DOCKERHUB_OBSCURA_IMAGE_NAME || 'task-handoff-controlled-obscura' }}
   DOCKERHUB_OPENCODE_IMAGE_NAME: ${{ vars.DOCKERHUB_OPENCODE_IMAGE_NAME || 'task-handoff-controlled-opencode' }}
   DOCKERHUB_AI_IMAGE_NAME: ${{ vars.DOCKERHUB_AI_IMAGE_NAME || 'task-handoff-controlled-ai' }}
   DOCKERHUB_WEBCAP_IMAGE_NAME: ${{ vars.DOCKERHUB_WEBCAP_IMAGE_NAME || 'task-handoff-controlled-webcap' }}
   DOCKERHUB_BROWSER_IMAGE_NAME: ${{ vars.DOCKERHUB_BROWSER_IMAGE_NAME || 'task-handoff-controlled-browser' }}
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      profiles: ${{ steps.profiles.outputs.profiles }}
+      profiles_space: ${{ steps.profiles.outputs.profiles_space }}
+      initial_profiles: ${{ steps.profiles.outputs.initial_profiles }}
+      has_profiles: ${{ steps.profiles.outputs.has_profiles }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify image repository contracts
+        run: node --test test/*.test.js
+
+      - uses: docker/setup-buildx-action@v4
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
+
+      - name: Login to Docker Hub for latest-tag discovery
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Resolve affected image profiles
+        id: profiles
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          set -euo pipefail
+          base="$BASE_SHA"
+          if [[ -z "$base" ]]; then
+            base="$(git describe --tags --abbrev=0 "${GITHUB_SHA}^" 2>/dev/null || true)"
+          fi
+          profiles="$(node scripts/resolve-changed-image-profiles.mjs --base "$base" --head "$GITHUB_SHA")"
+          initial_profiles="[]"
+
+          if [[ "$IS_RELEASE" == true ]]; then
+            for entry in \
+              "codex:${DOCKERHUB_CODEX_IMAGE_NAME}" \
+              "obscura:${DOCKERHUB_OBSCURA_IMAGE_NAME}" \
+              "opencode:${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
+              "ai:${DOCKERHUB_AI_IMAGE_NAME}" \
+              "webcap:${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
+              "browser:${DOCKERHUB_BROWSER_IMAGE_NAME}"
+            do
+              profile="${entry%%:*}"
+              image_name="${entry#*:}"
+              image="${DOCKERHUB_USERNAME}/${image_name}:latest"
+              if ! docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+                echo "No latest tag found for ${image}; scheduling its initial build."
+                initial_profiles="$(node -e '
+                  const profiles = new Set(JSON.parse(process.argv[1]));
+                  profiles.add(process.argv[2]);
+                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "browser"];
+                  process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
+                ' "$initial_profiles" "$profile")"
+                profiles="$(node -e '
+                  const profiles = new Set(JSON.parse(process.argv[1]));
+                  profiles.add(process.argv[2]);
+                  const order = ["codex", "obscura", "opencode", "ai", "webcap", "browser"];
+                  process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
+                ' "$profiles" "$profile")"
+              fi
+            done
+          fi
+
+          profiles_space="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).join(" "))' "$profiles")"
+          if [[ "$profiles" == "[]" ]]; then has_profiles=false; else has_profiles=true; fi
+          echo "Affected profiles: ${profiles_space:-none}"
+          echo "profiles=$profiles" >> "$GITHUB_OUTPUT"
+          echo "profiles_space=$profiles_space" >> "$GITHUB_OUTPUT"
+          echo "initial_profiles=$initial_profiles" >> "$GITHUB_OUTPUT"
+          echo "has_profiles=$has_profiles" >> "$GITHUB_OUTPUT"
+
   docker-build:
+    if: ${{ needs.detect-changes.outputs.has_profiles == 'true' }}
+    needs: detect-changes
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -49,10 +131,6 @@ jobs:
             runner: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
-
-      - name: Verify image repository contracts
-        if: ${{ matrix.arch == 'amd64' }}
-        run: node --test test/dockerfile.test.js
 
       - name: Resolve image version
         id: image-version
@@ -75,6 +153,7 @@ jobs:
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "codex-image-ref=${DOCKERHUB_CODEX_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
+          echo "obscura-image-ref=${DOCKERHUB_OBSCURA_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "opencode-image-ref=${DOCKERHUB_OPENCODE_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "ai-image-ref=${DOCKERHUB_AI_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "webcap-image-ref=${DOCKERHUB_WEBCAP_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
@@ -83,6 +162,7 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - name: Build Codex image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'codex') }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -100,6 +180,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
       - name: Build OpenCode image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'opencode') }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -116,7 +197,26 @@ jobs:
           cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
+      - name: Build Obscura image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'obscura') }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          target: profile-obscura
+          tags: task-handoff-controlled-obscura:ci-${{ matrix.arch }}
+          build-args: |
+            TASK_HANDOFF_IMAGE_VERSION=${{ steps.image-version.outputs.value }}
+            TASK_HANDOFF_BUILD_ID=${{ github.run_id }}
+            TASK_HANDOFF_BUILT_AT=${{ github.event.repository.updated_at }}
+            TASK_HANDOFF_GIT_COMMIT=${{ github.sha }}
+            TASK_HANDOFF_IMAGE_REF=${{ steps.image-version.outputs.obscura-image-ref }}
+          cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
+
       - name: Build AI image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'ai') }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -134,6 +234,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
       - name: Build WebCap image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'webcap') }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -151,6 +252,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
       - name: Build Browser image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'browser') }}
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -172,7 +274,8 @@ jobs:
           EXPECTED_VERSION: ${{ steps.image-version.outputs.value }}
         run: |
           set -euo pipefail
-          for profile in codex opencode ai webcap browser; do
+          mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
+          for profile in "${profiles[@]}"; do
             image="task-handoff-controlled-${profile}:ci-${{ matrix.arch }}"
             actual="$(docker image inspect "$image" --format '{{ index .Config.Labels "org.opencontainers.image.version" }}')"
             declared_profile="$(docker image inspect "$image" --format '{{ index .Config.Labels "io.task-handoff.image.profile" }}')"
@@ -212,23 +315,42 @@ jobs:
             for command in "$@"; do docker exec "$name" sh -lc "command -v '$command'" >/dev/null; done
           }
 
-          run_profile codex codex
-          run_profile opencode opencode
-          run_profile ai codex claude
-          run_profile webcap codex claude chromium vncserver web-cap
-          run_profile browser codex claude chromium vncserver code-server
-
-          ! docker exec task-handoff-codex-ci sh -lc 'command -v claude'
-          ! docker exec task-handoff-codex-ci sh -lc 'command -v chromium'
-          ! docker exec task-handoff-opencode-ci sh -lc 'command -v codex'
-          ! docker exec task-handoff-opencode-ci sh -lc 'command -v claude'
-          ! docker exec task-handoff-ai-ci sh -lc 'command -v chromium'
-          ! docker exec task-handoff-webcap-ci sh -lc 'command -v code-server'
-          ! docker exec task-handoff-browser-ci sh -lc 'command -v web-cap'
+          mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
+          for profile in "${profiles[@]}"; do
+            case "$profile" in
+              codex)
+                run_profile codex codex
+                ! docker exec task-handoff-codex-ci sh -lc 'command -v claude'
+                ! docker exec task-handoff-codex-ci sh -lc 'command -v chromium'
+                ;;
+              obscura)
+                run_profile obscura codex obscura obscura-worker
+                docker exec task-handoff-obscura-ci obscura --version
+                ! docker exec task-handoff-obscura-ci sh -lc 'command -v claude'
+                ;;
+              opencode)
+                run_profile opencode opencode
+                ! docker exec task-handoff-opencode-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-opencode-ci sh -lc 'command -v claude'
+                ;;
+              ai)
+                run_profile ai codex claude
+                ! docker exec task-handoff-ai-ci sh -lc 'command -v chromium'
+                ;;
+              webcap)
+                run_profile webcap codex claude chromium vncserver web-cap
+                ! docker exec task-handoff-webcap-ci sh -lc 'command -v code-server'
+                ;;
+              browser)
+                run_profile browser codex claude chromium vncserver code-server
+                ! docker exec task-handoff-browser-ci sh -lc 'command -v web-cap'
+                ;;
+            esac
+          done
 
       - name: Cleanup
         if: ${{ always() && matrix.arch == 'amd64' }}
-        run: docker rm -f task-handoff-codex-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-browser-ci 2>/dev/null || true
+        run: docker rm -f task-handoff-codex-ci task-handoff-obscura-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-browser-ci 2>/dev/null || true
 
       - name: Resolve published TaskHandoff compatibility versions
         if: ${{ matrix.arch == 'amd64' }}
@@ -239,6 +361,7 @@ jobs:
         if: ${{ matrix.arch == 'amd64' }}
         env:
           TASK_HANDOFF_VERSION_MATRIX: ${{ steps.task-handoff-versions.outputs.matrix }}
+          TASK_HANDOFF_IMAGE_PROFILES: ${{ needs.detect-changes.outputs.profiles_space }}
         shell: bash
         run: |
           set -euo pipefail
@@ -261,15 +384,16 @@ jobs:
         run: |
           set -euo pipefail
           sha_tag="docker-sha-${GITHUB_SHA}-${{ matrix.arch }}"
-          for entry in \
-            "codex:${DOCKERHUB_CODEX_IMAGE_NAME}" \
-            "opencode:${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
-            "ai:${DOCKERHUB_AI_IMAGE_NAME}" \
-            "webcap:${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
-            "browser:${DOCKERHUB_BROWSER_IMAGE_NAME}"
-          do
-            profile="${entry%%:*}"
-            image_name="${entry#*:}"
+          mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
+          for profile in "${profiles[@]}"; do
+            case "$profile" in
+              codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
+              obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
+              opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
+              ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
+              webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
+            esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
             if docker buildx imagetools inspect "${image}:${sha_tag}" >/dev/null 2>&1; then
               echo "Immutable image already exists; preserving ${image}:${sha_tag}."
@@ -281,7 +405,7 @@ jobs:
 
   publish-multiarch-image:
     if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
-    needs: docker-build
+    needs: [detect-changes, docker-build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -299,13 +423,16 @@ jobs:
         run: |
           set -euo pipefail
           sha_tag="docker-sha-${GITHUB_SHA}"
-          for image_name in \
-            "${DOCKERHUB_CODEX_IMAGE_NAME}" \
-            "${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
-            "${DOCKERHUB_AI_IMAGE_NAME}" \
-            "${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
-            "${DOCKERHUB_BROWSER_IMAGE_NAME}"
-          do
+          mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
+          for profile in "${profiles[@]}"; do
+            case "$profile" in
+              codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
+              obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
+              opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
+              ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
+              webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
+            esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
             if docker buildx imagetools inspect "${image}:${sha_tag}" >/dev/null 2>&1; then
               echo "Immutable multi-architecture image already exists; preserving ${image}:${sha_tag}."
@@ -320,7 +447,7 @@ jobs:
 
   promote-release:
     if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.image_version != '' }}
-    needs: publish-multiarch-image
+    needs: [detect-changes, publish-multiarch-image]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -358,13 +485,17 @@ jobs:
             fi
           fi
 
-          for image_name in \
-            "${DOCKERHUB_CODEX_IMAGE_NAME}" \
-            "${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
-            "${DOCKERHUB_AI_IMAGE_NAME}" \
-            "${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
-            "${DOCKERHUB_BROWSER_IMAGE_NAME}"
-          do
+          mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
+          mapfile -t initial_profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.initial_profiles }}')
+          for profile in "${profiles[@]}"; do
+            case "$profile" in
+              codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
+              obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
+              opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
+              ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
+              webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
+            esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
             if docker buildx imagetools inspect "${image}:${version}" >/dev/null 2>&1; then
               echo "::error::Immutable Docker release already exists: ${image}:${version}"
@@ -372,13 +503,15 @@ jobs:
             fi
           done
 
-          for image_name in \
-            "${DOCKERHUB_CODEX_IMAGE_NAME}" \
-            "${DOCKERHUB_OPENCODE_IMAGE_NAME}" \
-            "${DOCKERHUB_AI_IMAGE_NAME}" \
-            "${DOCKERHUB_WEBCAP_IMAGE_NAME}" \
-            "${DOCKERHUB_BROWSER_IMAGE_NAME}"
-          do
+          for profile in "${profiles[@]}"; do
+            case "$profile" in
+              codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
+              obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
+              opencode) image_name="$DOCKERHUB_OPENCODE_IMAGE_NAME" ;;
+              ai) image_name="$DOCKERHUB_AI_IMAGE_NAME" ;;
+              webcap) image_name="$DOCKERHUB_WEBCAP_IMAGE_NAME" ;;
+              browser) image_name="$DOCKERHUB_BROWSER_IMAGE_NAME" ;;
+            esac
             image="${DOCKERHUB_USERNAME}/${image_name}"
             source="${image}:docker-sha-${GITHUB_SHA}"
             tags=(--tag "${image}:${version}")
@@ -386,6 +519,12 @@ jobs:
               tags+=(--tag "${image}:latest")
             else
               tags+=(--tag "${image}:${channel}")
+              for initial_profile in "${initial_profiles[@]}"; do
+                if [[ "$profile" == "$initial_profile" ]]; then
+                  tags+=(--tag "${image}:latest")
+                  break
+                fi
+              done
             fi
             docker buildx imagetools create --prefer-index=false "${tags[@]}" "$source"
             docker buildx imagetools inspect "${image}:${version}"

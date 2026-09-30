@@ -1,11 +1,12 @@
 # TaskHandoff Images
 
 Public Linux base images for TaskHandoff Node Agent-managed Docker instances.
-The repository builds five profiles from shared layers:
+The repository builds six profiles from shared layers:
 
 | Image | Capabilities |
 | --- | --- |
 | `task-handoff-controlled-codex` | Terminal and Codex |
+| `task-handoff-controlled-obscura` | Terminal, Codex, and Obscura |
 | `task-handoff-controlled-opencode` | Terminal and OpenCode |
 | `task-handoff-controlled-ai` | Terminal, Codex, and Claude |
 | `task-handoff-controlled-webcap` | GUI terminal, browser, WebCap, Codex, and Claude |
