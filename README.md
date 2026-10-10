@@ -1,12 +1,16 @@
 # TaskHandoff Images
 
 Public Linux base images for TaskHandoff Node Agent-managed Docker instances.
-The repository builds six profiles from shared layers:
+This repository is the image side of
+[TaskHandoff](https://github.com/edgestorage/task-handoff): the application
+repository owns the control plane and Node Agent, while this repository owns the
+base images those agents run. It builds eight profiles from shared layers:
 
 | Image | Capabilities |
 | --- | --- |
 | `task-handoff-controlled-codex` | Terminal and Codex |
 | `task-handoff-controlled-obscura` | Terminal, Codex, and Obscura |
+| `task-handoff-controlled-rea` | Terminal, Codex, REA, and Linux reverse-engineering tools |
 | `task-handoff-controlled-opencode` | Terminal and OpenCode |
 | `task-handoff-controlled-ai` | Terminal, Codex, and Claude |
 | `task-handoff-controlled-webcap` | GUI terminal, browser, WebCap, Codex, and Claude |
@@ -18,6 +22,15 @@ metadata. They do not contain the TaskHandoff controlled-instance application.
 At container creation time, Node Agent mounts its authoritative bootstrap
 bundle, installs the desired controlled-instance runtime artifact into a
 persistent runtime volume, and starts that runtime.
+
+The REA profile installs REA together with its `reverse-engineer-anything`
+agent skill and the Codex MCP registration, plus the Linux toolchain REA drives
+directly: Chromium for website analysis, JDK 21 for Ghidra and JADX, pwntools
+for offline ELF and recorded-crash analysis, and mitmproxy for native network
+captures. Analysis engines themselves are not bundled; supply Ghidra
+(`GHIDRA_INSTALL_DIR`), IDA (`REA_IDA_MCP_CONFIG`), headless JADX
+(`REA_JADX_MCP_JAR`), binwalk (`REA_BINWALK_COMMAND`), and unblob
+(`REA_UNBLOB_COMMAND`) yourself.
 
 ## Local build
 
@@ -33,8 +46,8 @@ Select another profile with `TASK_HANDOFF_IMAGE_PROFILE`:
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
 ```
 
-Supported values are `codex`, `obscura`, `opencode`, `ai`, `webcap`, `bcap`,
-and `browser`.
+Supported values are `codex`, `obscura`, `rea`, `opencode`, `ai`, `webcap`,
+`bcap`, and `browser`.
 `TASK_HANDOFF_IMAGE_REF` overrides the local image tag. Tool versions are
 pinned by default; override their build arguments only for local testing.
 
@@ -93,6 +106,23 @@ and the repository allowlist unless a public key is pinned.
 
 The profile list and capabilities in `market/profiles.json` must stay in sync
 with the Dockerfile `io.task-handoff.image.*` labels; tests enforce this.
+
+## Related repositories
+
+- [`edgestorage/task-handoff`](https://github.com/edgestorage/task-handoff) is
+  the TaskHandoff application: the control plane, Node Agent, and the
+  controlled-instance runtime that consumes these images.
+- `edgestorage/task-handoff-images` (this repository) builds and publishes the
+  base images and maintains the market catalog.
+- [`edgestorage/task-handoff-docs`](https://github.com/edgestorage/task-handoff-docs)
+  holds the end-user documentation.
+
+The GUI and browser profiles also build in the
+[`edgestorage/web-cap`](https://github.com/edgestorage/web-cap) and
+[`edgestorage/bcap`](https://github.com/edgestorage/bcap) skills.
+
+Every image carries `org.opencontainers.image.source` pointing back to this
+repository; that label is what links each Docker Hub repository to its source.
 
 ## Ownership boundary
 

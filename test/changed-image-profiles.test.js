@@ -14,6 +14,7 @@ test("profile path changes select only dependent images", async () => {
   assert.deepEqual(profilesForPaths(["docker/image-entrypoint.sh"]), [
     "codex",
     "obscura",
+    "rea",
     "opencode",
     "ai",
     "webcap",
@@ -43,10 +44,10 @@ test("Dockerfile stage changes follow the image inheritance graph", async () => 
   );
   assert.deepEqual(
     profilesForDockerDiff(dockerfile, dockerfile, "@@ -4 +4 @@\n-RUN false\n+RUN true"),
-    ["codex", "obscura", "ai", "webcap", "bcap", "browser"],
+    ["codex", "obscura", "rea", "ai", "webcap", "bcap", "browser"],
   );
   assert.deepEqual(
     profilesForDockerDiff(dockerfile, dockerfile, "@@ -2 +2 @@\n-RUN false\n+RUN true"),
-    ["codex", "obscura", "opencode", "ai", "webcap", "bcap", "browser"],
+    ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"],
   );
 });
