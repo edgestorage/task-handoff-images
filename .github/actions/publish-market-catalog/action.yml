@@ -16,6 +16,9 @@ inputs:
     description: Directory that receives the generated Pages site.
     required: false
     default: pages-dist
+  revision:
+    description: Commit SHA recorded as the catalog revision; defaults to the workflow commit.
+    required: false
   signing-key:
     description: Optional ed25519 private key (PEM, base64 PKCS#8, or file path) for catalog signing.
     required: false
@@ -43,7 +46,7 @@ runs:
         DOCKERHUB_TOKEN: ${{ inputs.token }}
         TASK_HANDOFF_MARKET_NAMESPACE: ${{ inputs.namespace }}
         TASK_HANDOFF_MARKET_REGISTRY: ${{ inputs.registry }}
-        TASK_HANDOFF_GIT_COMMIT: ${{ github.sha }}
+        TASK_HANDOFF_GIT_COMMIT: ${{ inputs.revision || github.sha }}
         TASK_HANDOFF_CATALOG_SIGNING_KEY: ${{ inputs.signing-key }}
         TASK_HANDOFF_CATALOG_SIGNING_KEY_ID: ${{ inputs.signing-key-id }}
       run: |

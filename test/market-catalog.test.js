@@ -258,11 +258,13 @@ test("Pages workflows deploy the catalog through the shared action", () => {
   const pagesWorkflow = fs.readFileSync(path.join(root, ".github", "workflows", "pages.yml"), "utf8");
   const action = fs.readFileSync(path.join(root, ".github", "actions", "publish-market-catalog", "action.yml"), "utf8");
 
-  assert.match(workflow, /publish-market-catalog:[\s\S]*needs: promote-release/);
-  assert.match(workflow, /uses: \.\/\.github\/actions\/publish-market-catalog/);
-  assert.match(workflow, /pages: write/);
+  assert.doesNotMatch(workflow, /uses: \.\/\.github\/actions\/publish-market-catalog/);
+  assert.match(pagesWorkflow, /workflow_run:\n\s+workflows: \[Docker\]/);
+  assert.match(pagesWorkflow, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(pagesWorkflow, /workflow_dispatch:/);
+  assert.match(pagesWorkflow, /pages: write/);
   assert.match(pagesWorkflow, /uses: \.\/\.github\/actions\/publish-market-catalog/);
   assert.match(action, /node scripts\/build-market-catalog\.mjs/);
   assert.match(action, /actions\/deploy-pages@v4/);
+  assert.match(action, /TASK_HANDOFF_GIT_COMMIT: \$\{\{ inputs\.revision \|\| github\.sha \}\}/);
 });
