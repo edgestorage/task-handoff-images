@@ -82,9 +82,12 @@ GitHub Pages：<https://images.thandoff.com>。
 DOCKERHUB_USERNAME=<namespace> node scripts/build-market-catalog.mjs
 ```
 
-CI 在发布 tag 的 Docker workflow 末尾自动执行，也可以从 `Market Catalog
-Pages` workflow 手动重跑。首次启用需要在仓库设置里把 Pages 的来源设为
-GitHub Actions，并把 `images.thandoff.com` CNAME 指向 `edgestorage.github.io`。
+CI 通过 `Market Catalog Pages` workflow 执行：发布 tag 或手动指定版本的
+Docker workflow 成功后会自动触发，也可以 `workflow_dispatch` 手动触发。
+部署始终从 `main` 分支发起，因为 `github-pages` environment 只允许该分支
+部署，tag 触发的发布 workflow 不能自己部署 Pages。首次启用需要在仓库设置里把
+Pages 的来源设为 GitHub Actions，并把 `images.thandoff.com` CNAME 指向
+`edgestorage.github.io`。
 
 可选仓库配置：`TASK_HANDOFF_CATALOG_SIGNING_KEY` secret 保存 ed25519 私钥
 （PEM、base64 PKCS#8 或文件路径），`TASK_HANDOFF_CATALOG_SIGNING_KEY_ID`

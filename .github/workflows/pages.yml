@@ -1,6 +1,9 @@
 name: Market Catalog Pages
 
 on:
+  workflow_run:
+    workflows: [Docker]
+    types: [completed]
   workflow_dispatch:
     inputs:
       namespace:
@@ -24,6 +27,7 @@ concurrency:
 
 jobs:
   publish-market-catalog:
+    if: ${{ github.event_name == 'workflow_dispatch' || ((github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -39,5 +43,6 @@ jobs:
           namespace: ${{ inputs.namespace || secrets.DOCKERHUB_USERNAME }}
           token: ${{ secrets.DOCKERHUB_TOKEN }}
           registry: ${{ inputs.registry || 'docker.io' }}
+          revision: ${{ github.event.workflow_run.head_sha }}
           signing-key: ${{ secrets.TASK_HANDOFF_CATALOG_SIGNING_KEY }}
           signing-key-id: ${{ vars.TASK_HANDOFF_CATALOG_SIGNING_KEY_ID }}

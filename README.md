@@ -93,8 +93,12 @@ Generate the site locally (default output directory `pages/`):
 DOCKERHUB_USERNAME=<namespace> node scripts/build-market-catalog.mjs
 ```
 
-CI runs this at the end of the Docker workflow for release tags, and the
-`Market Catalog Pages` workflow can rerun it manually. The first deployment
+CI runs this from the `Market Catalog Pages` workflow: it fires automatically
+when a Docker workflow run for a release tag or a manual image version
+succeeds, and it can also be dispatched manually. The deployment always runs
+from `main`, because the `github-pages` environment only permits deployments
+from that branch; the tag-triggered release workflow must not deploy Pages
+itself. The first deployment
 requires setting the repository's Pages source to GitHub Actions and pointing
 the `images.thandoff.com` CNAME at `edgestorage.github.io`.
 
