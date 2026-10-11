@@ -1,11 +1,15 @@
 # TaskHandoff Images
 
-TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。本仓库从共享分层构建六个 profile：
+TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。这是
+[TaskHandoff](https://github.com/edgestorage/task-handoff) 的镜像侧仓库：应用
+主仓拥有控制平面和 Node Agent，本仓库拥有这些 agent 运行的基础镜像。本仓库从
+共享分层构建八个 profile：
 
 | 镜像 | 能力 |
 | --- | --- |
 | `task-handoff-controlled-codex` | Terminal、Codex |
 | `task-handoff-controlled-obscura` | Terminal、Codex、Obscura |
+| `task-handoff-controlled-rea` | Terminal、Codex、REA、Linux 逆向工具链 |
 | `task-handoff-controlled-opencode` | Terminal、OpenCode |
 | `task-handoff-controlled-ai` | Terminal、Codex、Claude |
 | `task-handoff-controlled-webcap` | GUI Terminal、Browser、WebCap、Codex、Claude |
@@ -16,6 +20,13 @@ TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。
 controlled-instance 应用。创建容器时，Node Agent 会挂载其权威 bootstrap
 bundle，把目标 controlled-instance runtime artifact 安装到持久化 runtime
 volume，再启动该 runtime。
+
+REA profile 会安装 REA 本体，并配好 `reverse-engineer-anything` agent skill 和
+Codex MCP 注册；同时预装 REA 可直接驱动的 Linux 工具链：Chromium（网站分析）、
+JDK 21（Ghidra 与 JADX）、pwntools（离线 ELF 与 crash 记录分析）、mitmproxy
+（原生抓包）。分析引擎本体不打包，需自行提供 Ghidra（`GHIDRA_INSTALL_DIR`）、
+IDA（`REA_IDA_MCP_CONFIG`）、headless JADX（`REA_JADX_MCP_JAR`）、binwalk
+（`REA_BINWALK_COMMAND`）和 unblob（`REA_UNBLOB_COMMAND`）。
 
 ## 本地构建
 
@@ -31,7 +42,8 @@ volume，再启动该 runtime。
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
 ```
 
-支持 `codex`、`obscura`、`opencode`、`ai`、`webcap`、`bcap` 和 `browser`。
+支持 `codex`、`obscura`、`rea`、`opencode`、`ai`、`webcap`、`bcap` 和
+`browser`。
 `TASK_HANDOFF_IMAGE_REF` 可以覆盖本地镜像 tag。工具版本默认固定；其他版本
 构建参数只用于本地测试。
 
@@ -81,6 +93,23 @@ HTTPS 和仓库 allowlist 校验目录。
 
 `market/profiles.json` 的 profile 列表和 capability 必须与 Dockerfile 的
 `io.task-handoff.image.*` label 保持一致，测试会强制校验。
+
+## 相关仓库
+
+- [`edgestorage/task-handoff`](https://github.com/edgestorage/task-handoff)：
+  TaskHandoff 应用主仓，拥有控制平面、Node Agent 及消费这些镜像的
+  controlled-instance runtime。
+- `edgestorage/task-handoff-images`（本仓库）：构建并发布基础镜像，维护
+  market catalog。
+- [`edgestorage/task-handoff-docs`](https://github.com/edgestorage/task-handoff-docs)：
+  面向用户的文档。
+
+GUI 和 browser profile 还会构建
+[`edgestorage/web-cap`](https://github.com/edgestorage/web-cap) 和
+[`edgestorage/bcap`](https://github.com/edgestorage/bcap) 两个 skill。
+
+每个镜像都带有指回本仓库的 `org.opencontainers.image.source`，Docker Hub
+仓库页的源码关联就来自这个 label。
 
 ## 所有权边界
 

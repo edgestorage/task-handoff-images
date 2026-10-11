@@ -23,6 +23,7 @@ ENV NODE_ENV=production
 ENV TASK_HANDOFF_INSTANCE_RUNTIME_ROOT=/opt/task-handoff/instance-runtime
 
 LABEL org.opencontainers.image.version=${TASK_HANDOFF_IMAGE_VERSION}
+LABEL org.opencontainers.image.source=https://github.com/edgestorage/task-handoff-images
 WORKDIR /app
 
 RUN apt-get update \
@@ -99,6 +100,54 @@ RUN set -eux; \
   tar -xzf "${obscura_archive}" -C /usr/local/bin obscura obscura-worker; \
   rm -f "${obscura_archive}"; \
   obscura --version
+
+FROM profile-codex-root AS profile-rea-root
+ARG REA_AGENTS_PACKAGE=rea-agents@6.3.0
+ARG TARGETOS
+ARG TARGETARCH
+ARG TEMURIN_JDK_RELEASE=jdk-21.0.12.1%2B1
+ARG TEMURIN_JDK_BUILD=21.0.12.1_1
+ARG TEMURIN_JDK_AMD64_SHA256=ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94
+ARG TEMURIN_JDK_ARM64_SHA256=23e37e026f12f3e706f18938ff611db3032d075b09d0879a25d06718c773e223
+ENV JAVA_HOME=/opt/java/temurin-21
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    chromium \
+    chromium-sandbox \
+    mitmproxy \
+    python3-pwntools \
+  ; \
+  rm -rf /var/lib/apt/lists/*; \
+  case "${TARGETOS:-linux}-${TARGETARCH:-amd64}" in \
+    linux-amd64) temurin_arch="x64"; temurin_sha256="${TEMURIN_JDK_AMD64_SHA256}" ;; \
+    linux-arm64) temurin_arch="aarch64"; temurin_sha256="${TEMURIN_JDK_ARM64_SHA256}" ;; \
+    *) echo "Unsupported Temurin JDK Docker target: ${TARGETOS:-linux}-${TARGETARCH:-amd64}" >&2; exit 1 ;; \
+  esac; \
+  temurin_archive="/tmp/temurin-jdk.tar.gz"; \
+  curl -fsSL -o "${temurin_archive}" \
+    "https://github.com/adoptium/temurin21-binaries/releases/download/${TEMURIN_JDK_RELEASE}/OpenJDK21U-jdk_${temurin_arch}_linux_hotspot_${TEMURIN_JDK_BUILD}.tar.gz"; \
+  echo "${temurin_sha256}  ${temurin_archive}" | sha256sum -c -; \
+  mkdir -p "${JAVA_HOME}"; \
+  tar -xzf "${temurin_archive}" -C "${JAVA_HOME}" --strip-components=1; \
+  rm -f "${temurin_archive}"; \
+  ln -sf "${JAVA_HOME}/bin/java" /usr/local/bin/java; \
+  ln -sf "${JAVA_HOME}/bin/javac" /usr/local/bin/javac; \
+  chromium --version; \
+  java -version; \
+  javac -version; \
+  mitmdump --version; \
+  python3 -c 'import pwnlib'
+
+RUN set -eux; \
+  npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$REA_AGENTS_PACKAGE"; \
+  rea --version; \
+  HOME=/home/agent CODEX_HOME=/home/agent/.codex rea setup --client codex --yes --format json >/tmp/task-handoff-rea-setup.json; \
+  rea doctor --client codex --format json >/dev/null; \
+  test -f /home/agent/.codex/config.toml; \
+  test -f /home/agent/.agents/skills/reverse-engineer-anything/SKILL.md; \
+  rm -f /tmp/task-handoff-rea-setup.json; \
+  chown -R agent:agent /home/agent/.codex /home/agent/.agents
 
 FROM runtime-core AS profile-opencode-root
 ARG OPENCODE_CLI_PACKAGE=opencode-ai@1.18.29
@@ -263,6 +312,26 @@ ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
 ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
 LABEL io.task-handoff.image.profile=obscura
 LABEL io.task-handoff.image.capabilities=terminal,codex,obscura
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
+FROM profile-rea-root AS profile-rea
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-rea:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=rea
+LABEL io.task-handoff.image.capabilities=terminal,codex,rea
 
 USER agent
 EXPOSE 8080

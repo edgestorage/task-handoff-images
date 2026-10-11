@@ -27,15 +27,16 @@ test("Docker profiles run as agent with passwordless container-root escalation",
   assert.match(dockerfile, /printf 'agent ALL=\(root\) NOPASSWD: ALL\\n' > \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /chmod 0440 \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /visudo -cf \/etc\/sudoers\.d\/task-handoff-agent/);
-  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 7);
+  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 8);
 });
 
-test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, BCap, and Browser image profiles from shared layers", () => {
+test("Docker exports Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browser image profiles from shared layers", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
 
   assert.match(dockerfile, /FROM runtime-core AS profile-codex-root/);
   assert.match(dockerfile, /FROM profile-codex-root AS profile-obscura-root/);
+  assert.match(dockerfile, /FROM profile-codex-root AS profile-rea-root/);
   assert.match(dockerfile, /FROM runtime-core AS profile-opencode-root/);
   assert.match(dockerfile, /FROM profile-codex-root AS profile-ai-root/);
   assert.match(dockerfile, /FROM profile-ai-root AS profile-gui-root/);
@@ -45,6 +46,7 @@ test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, BCap, and Browser ima
   assert.doesNotMatch(dockerfile, /ENV TASK_HANDOFF_IMAGE_(?:PROFILE|CAPABILITIES)=/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,obscura/);
+  assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,rea/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,opencode/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,web-cap,codex,claude/);
@@ -54,9 +56,11 @@ test("Docker exports Codex, Obscura, OpenCode, AI, WebCap, BCap, and Browser ima
   assert.match(dockerfile, /ARG OPENCODE_CLI_PACKAGE=opencode-ai@\d+\.\d+\.\d+[\s\S]*npm install -g[\s\S]*"\$OPENCODE_CLI_PACKAGE"[\s\S]*opencode --version/);
   assert.match(buildScript, /opencode\)\n\s+BUILD_TARGET="profile-opencode"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-opencode:local"/);
   assert.match(buildScript, /obscura\)\n\s+BUILD_TARGET="profile-obscura"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"/);
+  assert.match(buildScript, /rea\)\n\s+BUILD_TARGET="profile-rea"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-rea:local"/);
   assert.match(buildScript, /bcap\)\n\s+BUILD_TARGET="profile-bcap"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-bcap:local"/);
   assert.match(buildScript, /CODEX_CLI_PACKAGE=\$\{CODEX_CLI_PACKAGE:-@openai\/codex@\d+\.\d+\.\d+\}/);
   assert.match(buildScript, /OPENCODE_CLI_PACKAGE=\$\{OPENCODE_CLI_PACKAGE:-opencode-ai@\d+\.\d+\.\d+\}/);
+  assert.match(buildScript, /REA_AGENTS_PACKAGE=\$\{REA_AGENTS_PACKAGE:-rea-agents@\d+\.\d+\.\d+\}/);
 });
 
 test("Docker BCap profile installs the pinned bcap skill on the chromium base", () => {
@@ -93,6 +97,44 @@ test("Docker installs pinned Obscura release binaries for amd64 and arm64", () =
   assert.match(dockerfile, /tar -xzf "\$\{obscura_archive\}" -C \/usr\/local\/bin obscura obscura-worker/);
   assert.match(dockerfile, /obscura --version/);
   assert.match(buildScript, /OBSCURA_VERSION=\$\{OBSCURA_VERSION:-\d+\.\d+\.\d+\}/);
+});
+
+test("Docker REA profile installs the pinned REA MCP server and registers it for Codex", () => {
+  const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
+  const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
+  const reaRootStart = dockerfile.indexOf("FROM profile-codex-root AS profile-rea-root");
+  const opencodeRootStart = dockerfile.indexOf("FROM runtime-core AS profile-opencode-root");
+
+  assert.ok(reaRootStart >= 0 && opencodeRootStart > reaRootStart);
+  const reaRoot = dockerfile.slice(reaRootStart, opencodeRootStart);
+  assert.match(reaRoot, /ARG REA_AGENTS_PACKAGE=rea-agents@\d+\.\d+\.\d+/);
+  assert.match(reaRoot, /apt-get install -y --no-install-recommends[\s\S]*chromium[\s\S]*chromium-sandbox[\s\S]*mitmproxy[\s\S]*python3-pwntools/);
+  assert.match(reaRoot, /ARG TEMURIN_JDK_RELEASE=jdk-21\.\d+\.\d+\.\d+%2B\d+/);
+  assert.match(reaRoot, /ARG TEMURIN_JDK_AMD64_SHA256=[a-f0-9]{64}/);
+  assert.match(reaRoot, /ARG TEMURIN_JDK_ARM64_SHA256=[a-f0-9]{64}/);
+  assert.match(reaRoot, /ENV JAVA_HOME=\/opt\/java\/temurin-21/);
+  assert.match(reaRoot, /linux-amd64\) temurin_arch="x64"/);
+  assert.match(reaRoot, /linux-arm64\) temurin_arch="aarch64"/);
+  assert.match(reaRoot, /releases\/download\/\$\{TEMURIN_JDK_RELEASE\}\/OpenJDK21U-jdk_\$\{temurin_arch\}_linux_hotspot_\$\{TEMURIN_JDK_BUILD\}\.tar\.gz/);
+  assert.match(reaRoot, /sha256sum -c -/);
+  assert.match(reaRoot, /tar -xzf "\$\{temurin_archive\}" -C "\$\{JAVA_HOME\}" --strip-components=1/);
+  assert.doesNotMatch(reaRoot, /openjdk-21|backports/);
+  assert.match(reaRoot, /chromium --version/);
+  assert.match(reaRoot, /java -version/);
+  assert.match(reaRoot, /javac -version/);
+  assert.match(reaRoot, /mitmdump --version/);
+  assert.match(reaRoot, /python3 -c 'import pwnlib'/);
+  assert.match(reaRoot, /npm install -g[\s\S]*"\$REA_AGENTS_PACKAGE"[\s\S]*rea --version/);
+  assert.match(reaRoot, /HOME=\/home\/agent CODEX_HOME=\/home\/agent\/\.codex rea setup --client codex --yes --format json/);
+  assert.match(reaRoot, /rea doctor --client codex --format json/);
+  assert.match(reaRoot, /test -f \/home\/agent\/\.codex\/config\.toml/);
+  assert.match(reaRoot, /reverse-engineer-anything\/SKILL\.md/);
+  assert.match(reaRoot, /chown -R agent:agent \/home\/agent\/\.codex \/home\/agent\/\.agents/);
+  assert.doesNotMatch(reaRoot, /install_web_cap|install_bcap|code-server|obscura --version/);
+  assert.doesNotMatch(reaRoot, /ghidra|jadx|binwalk|unblob/i);
+  assert.match(buildScript, /REA_AGENTS_PACKAGE=\$\{REA_AGENTS_PACKAGE:-rea-agents@\d+\.\d+\.\d+\}/);
+  assert.match(buildScript, /TEMURIN_JDK_RELEASE=\$\{TEMURIN_JDK_RELEASE:-jdk-21\.\d+\.\d+\.\d+%2B\d+\}/);
+  assert.match(buildScript, /TEMURIN_JDK_AMD64_SHA256=\$\{TEMURIN_JDK_AMD64_SHA256:-[a-f0-9]{64}\}/);
 });
 
 test("Docker WebCap profile installs WebCap without code-server", () => {
@@ -251,7 +293,7 @@ test("Docker publication is gated by current and N-1 published TaskHandoff runti
   assert.match(resolver, /\{ channel: "current", version: latest \}/);
   assert.match(resolver, /\{ channel: "n-1", version: stableVersions\[latestIndex - 1\] \}/);
   assert.match(compatibility, /npm install[\s\S]*"@task-handoff\/node-agent@\$\{version\}"/);
-  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura opencode ai webcap bcap browser/);
+  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura rea opencode ai webcap bcap browser/);
   assert.match(compatibility, /runtime-installer\.mjs install/);
   assert.match(compatibility, /docker restart/);
   assert.match(compatibility, /\/api\/health/);

@@ -26,6 +26,16 @@
       "optionalApps": ["terminal-tty"]
     },
     {
+      "profile": "rea",
+      "id": "market_taskhandoff_rea",
+      "slug": "rea",
+      "name": "TaskHandoff REA",
+      "description": "Codex runtime with terminal, Codex, and REA reverse-engineering tools.",
+      "localizedDescriptions": { "zh-CN": "包含终端、Codex 和 REA 逆向工程工具的运行环境。" },
+      "capabilities": ["terminal", "codex", "rea"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
       "profile": "opencode",
       "id": "market_taskhandoff_opencode",
       "slug": "opencode",
