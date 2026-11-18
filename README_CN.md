@@ -21,6 +21,12 @@ controlled-instance 应用。创建容器时，Node Agent 会挂载其权威 boo
 bundle，把目标 controlled-instance runtime artifact 安装到持久化 runtime
 volume，再启动该 runtime。
 
+Codex、OpenCode 和 Claude 使用制品仓库中的 native package：镜像下载固定平台
+tarball、校验完整性，并预置到
+`/data/task-handoff/managed-apps/native/<app-id>/`，不会执行全局
+`npm install`。新建实例的数据卷会继承这份预置内容；已有数据卷不会被镜像
+更新覆盖，需要通过 App management 安装或更新这些应用。
+
 REA profile 会安装 REA 本体，并配好 `reverse-engineer-anything` agent skill 和
 Codex MCP 注册；同时预装 REA 可直接驱动的 Linux 工具链：Chromium（网站分析）、
 JDK 21（Ghidra 与 JADX）、pwntools（离线 ELF 与 crash 记录分析）、mitmproxy

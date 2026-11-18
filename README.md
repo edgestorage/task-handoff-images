@@ -23,6 +23,14 @@ At container creation time, Node Agent mounts its authoritative bootstrap
 bundle, installs the desired controlled-instance runtime artifact into a
 persistent runtime volume, and starts that runtime.
 
+Codex, OpenCode, and Claude are managed native packages. The image downloads
+the pinned platform tarballs from the npm registry, verifies their integrity,
+and seeds them under
+`/data/task-handoff/managed-apps/native/<app-id>/`; it never runs a global
+`npm install`. Docker copies this seed into a new instance data volume. Existing
+volumes are not rewritten by an image update, so use App management to install
+or update those apps.
+
 The REA profile installs REA together with its `reverse-engineer-anything`
 agent skill and the Codex MCP registration, plus the Linux toolchain REA drives
 directly: Chromium for website analysis, JDK 21 for Ghidra and JADX, pwntools

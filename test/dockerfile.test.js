@@ -52,14 +52,12 @@ test("Docker exports Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browse
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,web-cap,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,bcap,codex,claude/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,gui-terminal,browser,vscode-web,codex,claude/);
-  assert.match(dockerfile, /ARG CODEX_CLI_PACKAGE=@openai\/codex@\d+\.\d+\.\d+/);
-  assert.match(dockerfile, /ARG OPENCODE_CLI_PACKAGE=opencode-ai@\d+\.\d+\.\d+[\s\S]*npm install -g[\s\S]*"\$OPENCODE_CLI_PACKAGE"[\s\S]*opencode --version/);
+  assert.match(dockerfile, /FROM runtime-core AS profile-codex-root[\s\S]*install-native-app\.mjs codex/);
+  assert.match(dockerfile, /FROM runtime-core AS profile-opencode-root[\s\S]*install-native-app\.mjs opencode/);
   assert.match(buildScript, /opencode\)\n\s+BUILD_TARGET="profile-opencode"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-opencode:local"/);
   assert.match(buildScript, /obscura\)\n\s+BUILD_TARGET="profile-obscura"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"/);
   assert.match(buildScript, /rea\)\n\s+BUILD_TARGET="profile-rea"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-rea:local"/);
   assert.match(buildScript, /bcap\)\n\s+BUILD_TARGET="profile-bcap"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-bcap:local"/);
-  assert.match(buildScript, /CODEX_CLI_PACKAGE=\$\{CODEX_CLI_PACKAGE:-@openai\/codex@\d+\.\d+\.\d+\}/);
-  assert.match(buildScript, /OPENCODE_CLI_PACKAGE=\$\{OPENCODE_CLI_PACKAGE:-opencode-ai@\d+\.\d+\.\d+\}/);
   assert.match(buildScript, /REA_AGENTS_PACKAGE=\$\{REA_AGENTS_PACKAGE:-rea-agents@\d+\.\d+\.\d+\}/);
 });
 
@@ -125,8 +123,8 @@ test("Docker REA profile installs the pinned REA MCP server and registers it for
   assert.match(reaRoot, /mitmdump --version/);
   assert.match(reaRoot, /python3 -c 'import pwnlib'/);
   assert.match(reaRoot, /npm install -g[\s\S]*"\$REA_AGENTS_PACKAGE"[\s\S]*rea --version/);
-  assert.match(reaRoot, /HOME=\/home\/agent CODEX_HOME=\/home\/agent\/\.codex rea setup --client codex --yes --format json/);
-  assert.match(reaRoot, /rea doctor --client codex --format json/);
+  assert.match(reaRoot, /HOME=\/home\/agent CODEX_HOME=\/home\/agent\/\.codex PATH="\$\(dirname "\$CODEX_LAUNCHER"\):\$PATH" rea setup --client codex --yes --format json/);
+  assert.match(reaRoot, /PATH="\$\(dirname "\$CODEX_LAUNCHER"\):\$PATH" rea doctor --client codex --format json/);
   assert.match(reaRoot, /test -f \/home\/agent\/\.codex\/config\.toml/);
   assert.match(reaRoot, /reverse-engineer-anything\/SKILL\.md/);
   assert.match(reaRoot, /chown -R agent:agent \/home\/agent\/\.codex \/home\/agent\/\.agents/);
@@ -258,7 +256,7 @@ test("Docker fetches the Web Cap skill from its versioned upstream source", () =
 
 test("Docker installs Claude Code through the same canonical package managed at runtime", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
-  assert.match(dockerfile, /npm install -g --include=optional[^\n]*\\\n\s+"@anthropic-ai\/claude-code@\$\{CLAUDE_CODE_VERSION\}"/);
+  assert.match(dockerfile, /FROM profile-codex-root AS profile-ai-root[\s\S]*install-native-app\.mjs claude/);
   assert.doesNotMatch(dockerfile, /@anthropic-ai\/claude-code-linux-/);
   assert.doesNotMatch(dockerfile, /claude_native_package/);
 });

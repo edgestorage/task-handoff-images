@@ -13,6 +13,7 @@ ENV TASK_HANDOFF_ARTIFACT_DIR=/data/artifacts
 ENV TASK_HANDOFF_APP_SESSION_DIR=/data/task-handoff/app-sessions
 ENV TASK_HANDOFF_RUNTIME_DIR=/data/task-handoff/runtime
 ENV TASK_HANDOFF_EVENTS_DIR=/data/task-handoff/events
+ENV TASK_HANDOFF_MANAGED_APP_ROOT=/data/task-handoff/managed-apps
 ENV TASK_HANDOFF_LOG_DIR=/data/logs
 ENV TASK_HANDOFF_NOVNC_ROOT=/usr/share/novnc
 ENV TASK_HANDOFF_VNC_BACKEND=kasmvnc
@@ -54,12 +55,15 @@ RUN if id -u agent >/dev/null 2>&1; then \
 FROM runtime-base AS runtime-core
 COPY docker/image-entrypoint.sh /usr/local/bin/task-handoff-image-entrypoint
 COPY docker/healthcheck.sh /usr/local/bin/task-handoff-healthcheck
+COPY docker/install-native-app.mjs /opt/task-handoff/install-native-app.mjs
+COPY docker/native-app-pins.json /opt/task-handoff/native-app-pins.json
 
 RUN chmod +x /usr/local/bin/task-handoff-image-entrypoint /usr/local/bin/task-handoff-healthcheck \
   && mkdir -p \
     /workspace \
     /data/task-handoff/app-catalog \
     /data/task-handoff/app-sessions \
+    /data/task-handoff/managed-apps/native \
     /data/task-handoff/runtime \
     /opt/task-handoff/instance-runtime/releases \
     /opt/task-handoff/instance-runtime/staging \
@@ -76,9 +80,9 @@ RUN rm -rf /tmp/.X11-unix \
 # Install profile layers before volatile metadata so profile builds share all
 # expensive application, CLI, and system package layers.
 FROM runtime-core AS profile-codex-root
-ARG CODEX_CLI_PACKAGE=@openai/codex@0.153.4
-RUN npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$CODEX_CLI_PACKAGE" \
-  && codex --version
+ARG TARGETARCH
+RUN node /opt/task-handoff/install-native-app.mjs codex --arch "${TARGETARCH:-$(dpkg --print-architecture)}" \
+  && chown -R agent:agent /data/task-handoff/managed-apps
 
 FROM profile-codex-root AS profile-obscura-root
 ARG TARGETOS
@@ -140,26 +144,25 @@ RUN set -eux; \
   python3 -c 'import pwnlib'
 
 RUN set -eux; \
+  CODEX_LAUNCHER="$(node /opt/task-handoff/install-native-app.mjs codex --arch "${TARGETARCH:-$(dpkg --print-architecture)}" --print-launcher)"; \
   npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$REA_AGENTS_PACKAGE"; \
   rea --version; \
-  HOME=/home/agent CODEX_HOME=/home/agent/.codex rea setup --client codex --yes --format json >/tmp/task-handoff-rea-setup.json; \
-  rea doctor --client codex --format json >/dev/null; \
+  HOME=/home/agent CODEX_HOME=/home/agent/.codex PATH="$(dirname "$CODEX_LAUNCHER"):$PATH" rea setup --client codex --yes --format json >/tmp/task-handoff-rea-setup.json; \
+  PATH="$(dirname "$CODEX_LAUNCHER"):$PATH" rea doctor --client codex --format json >/dev/null; \
   test -f /home/agent/.codex/config.toml; \
   test -f /home/agent/.agents/skills/reverse-engineer-anything/SKILL.md; \
   rm -f /tmp/task-handoff-rea-setup.json; \
   chown -R agent:agent /home/agent/.codex /home/agent/.agents
 
 FROM runtime-core AS profile-opencode-root
-ARG OPENCODE_CLI_PACKAGE=opencode-ai@1.18.29
-RUN npm_config_update_notifier=false npm install -g --include=optional --no-audit --no-fund --loglevel=warn "$OPENCODE_CLI_PACKAGE" \
-  && opencode --version
+ARG TARGETARCH
+RUN node /opt/task-handoff/install-native-app.mjs opencode --arch "${TARGETARCH:-$(dpkg --print-architecture)}" \
+  && chown -R agent:agent /data/task-handoff/managed-apps
 
 FROM profile-codex-root AS profile-ai-root
-ARG CLAUDE_CODE_VERSION=2.1.183
-RUN set -eux; \
-  npm_config_update_notifier=false timeout 180s npm install -g --include=optional --no-audit --no-fund --loglevel=verbose \
-    "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"; \
-  claude --version
+ARG TARGETARCH
+RUN node /opt/task-handoff/install-native-app.mjs claude --arch "${TARGETARCH:-$(dpkg --print-architecture)}" \
+  && chown -R agent:agent /data/task-handoff/managed-apps
 
 FROM profile-ai-root AS profile-gui-root
 ARG KASMVNC_VERSION=1.4.0

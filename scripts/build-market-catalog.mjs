@@ -55,9 +55,13 @@ export async function buildMarketCatalogSite(options, env = process.env, deps = 
 
   const domain = options.domain || metadata.siteDomain;
   const registry = options.registry || env.TASK_HANDOFF_MARKET_REGISTRY || "docker.io";
+  const visibleMetadata = {
+    ...metadata,
+    profiles: metadata.profiles.filter((profile) => profile.hidden !== true),
+  };
   const skippedProfiles = [];
   const catalog = await collectMarketCatalog({
-    metadata,
+    metadata: visibleMetadata,
     namespace,
     registry,
     revision: options.revision || resolveRevision(env),

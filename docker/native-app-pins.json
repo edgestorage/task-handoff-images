@@ -1,0 +1,53 @@
+{
+  "codex": {
+    "version": "0.165.0",
+    "targets": {
+      "x64": {
+        "package": "@openai/codex",
+        "packageVersion": "0.165.0-linux-x64",
+        "integrity": "sha512-FotDc7bVHwaommtsdDP8PPrH0a5IwC/t8H/LhdEcH4EBqgeYFRCtptiHcuwgvNRCLbTbOyFE/Ur6GzYCljgaSQ==",
+        "launchPath": "vendor/x86_64-unknown-linux-musl/bin/codex"
+      },
+      "arm64": {
+        "package": "@openai/codex",
+        "packageVersion": "0.165.0-linux-arm64",
+        "integrity": "sha512-qdrYdcabxn3biX2qTtb/GuuMk20ZAQYxcmY7lHcp6CkAzyqsXbL0vIJFwWJr83/pNM+CUZH4YaTPns2kN7ZIfA==",
+        "launchPath": "vendor/aarch64-unknown-linux-musl/bin/codex"
+      }
+    }
+  },
+  "opencode": {
+    "version": "1.18.30",
+    "targets": {
+      "x64": {
+        "package": "opencode-linux-x64-baseline",
+        "packageVersion": "1.18.30",
+        "integrity": "sha512-//sHZuMaNZXo6fzBtgUI5vf1oXiMX9Un2a2R3AUzajRahuW42+98wg9J33uuICblE3RS6G4HxobrvnWA8mr4VA==",
+        "launchPath": "bin/opencode"
+      },
+      "arm64": {
+        "package": "opencode-linux-arm64",
+        "packageVersion": "1.18.30",
+        "integrity": "sha512-KU2VO9oGRhV3M9LCYJXeBBtadIIgJYf620KMHFeghrGL0967Zz7PAcMBFZqTy7gUqNEnMaqOqAkSGx57BIw41Q==",
+        "launchPath": "bin/opencode"
+      }
+    }
+  },
+  "claude": {
+    "version": "2.1.286",
+    "targets": {
+      "x64": {
+        "package": "@anthropic-ai/claude-code-linux-x64",
+        "packageVersion": "2.1.286",
+        "integrity": "sha512-PnVL8ZCEev3IexLeOc9/QRfqRDUZRgnsaMLdpjlBN0VaieeTrf7mZ2JJi29ue2KAqHvq6SsOadU5G/shnFE4MA==",
+        "launchPath": "claude"
+      },
+      "arm64": {
+        "package": "@anthropic-ai/claude-code-linux-arm64",
+        "packageVersion": "2.1.286",
+        "integrity": "sha512-dHQ/ObyC4jaGHVk+gFE8P8PALMIVLhQSyhiC3y3kkuLp0H0MHgLxHt/srQ3zJs892ClDbtl1swxv4bw1ioruZA==",
+        "launchPath": "claude"
+      }
+    }
+  }
+}

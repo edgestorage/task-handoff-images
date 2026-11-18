@@ -53,7 +53,8 @@
       "description": "AI development runtime with Codex, Claude, and terminal.",
       "localizedDescriptions": { "zh-CN": "AI 开发运行环境，包含 Codex、Claude 和终端。" },
       "capabilities": ["terminal", "codex", "claude"],
-      "optionalApps": ["terminal-tty"]
+      "optionalApps": ["terminal-tty"],
+      "hidden": true
     },
     {
       "profile": "webcap",
