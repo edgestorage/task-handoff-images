@@ -420,11 +420,30 @@ jobs:
             for command in "$@"; do docker exec "$name" sh -lc "command -v '$command'" >/dev/null; done
           }
 
+          assert_managed_app() {
+            local name="$1"
+            local app="$2"
+            local launcher
+            launcher="$(docker exec "$name" node /opt/task-handoff/install-native-app.mjs "$app" --print-launcher)"
+            test -n "$launcher"
+            docker exec --user agent "$name" test -x "$launcher"
+            docker exec --user agent -e HOME=/home/agent "$name" "$launcher" --version >/dev/null
+          }
+
+          assert_no_managed_app() {
+            local name="$1"
+            local app="$2"
+            test "$(docker exec "$name" sh -lc "test ! -e '/data/task-handoff/managed-apps/native/${app}' && echo absent")" = absent
+          }
+
           mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
           for profile in "${profiles[@]}"; do
             case "$profile" in
               base)
                 run_profile base bash git node npm python3
+                assert_no_managed_app task-handoff-base-ci codex
+                assert_no_managed_app task-handoff-base-ci claude
+                assert_no_managed_app task-handoff-base-ci opencode
                 ! docker exec task-handoff-base-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-base-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-base-ci sh -lc 'command -v opencode'
@@ -435,6 +454,9 @@ jobs:
                 ;;
               desktop-minimal)
                 run_profile desktop-minimal Xvfb xauth openbox tint2 jgmenu xterm
+                assert_no_managed_app task-handoff-desktop-minimal-ci codex
+                assert_no_managed_app task-handoff-desktop-minimal-ci claude
+                assert_no_managed_app task-handoff-desktop-minimal-ci opencode
                 ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v opencode'
@@ -445,6 +467,9 @@ jobs:
               desktop-xfce)
                 run_profile desktop-xfce Xvfb xauth dbus-run-session startxfce4 xfce4-session xfwm4 thunar xfce4-terminal
                 docker exec task-handoff-desktop-xfce-ci sh -lc 'test -f /usr/share/xsessions/xfce.desktop'
+                assert_no_managed_app task-handoff-desktop-xfce-ci codex
+                assert_no_managed_app task-handoff-desktop-xfce-ci claude
+                assert_no_managed_app task-handoff-desktop-xfce-ci opencode
                 ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v opencode'
@@ -452,38 +477,58 @@ jobs:
                 ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v vncserver'
                 ;;
               codex)
-                run_profile codex codex
+                run_profile codex
+                assert_managed_app task-handoff-codex-ci codex
+                ! docker exec task-handoff-codex-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-codex-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-codex-ci sh -lc 'command -v chromium'
                 ;;
               obscura)
-                run_profile obscura codex obscura obscura-worker
+                run_profile obscura obscura obscura-worker
+                assert_managed_app task-handoff-obscura-ci codex
                 docker exec task-handoff-obscura-ci obscura --version
+                ! docker exec task-handoff-obscura-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-obscura-ci sh -lc 'command -v claude'
                 ;;
               rea)
-                run_profile rea codex rea chromium java javac mitmdump
+                run_profile rea rea chromium java javac mitmdump
+                assert_managed_app task-handoff-rea-ci codex
                 docker exec --user agent task-handoff-rea-ci rea --version
                 docker exec task-handoff-rea-ci sh -lc 'python3 -c "import pwnlib"'
                 docker exec task-handoff-rea-ci sh -lc 'test -f /home/agent/.codex/config.toml'
                 docker exec task-handoff-rea-ci sh -lc 'test -f /home/agent/.agents/skills/reverse-engineer-anything/SKILL.md'
+                ! docker exec task-handoff-rea-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-rea-ci sh -lc 'command -v claude'
                 ;;
               opencode)
-                run_profile opencode opencode
+                run_profile opencode
+                assert_managed_app task-handoff-opencode-ci opencode
+                ! docker exec task-handoff-opencode-ci sh -lc 'command -v opencode'
                 ! docker exec task-handoff-opencode-ci sh -lc 'command -v codex'
                 ! docker exec task-handoff-opencode-ci sh -lc 'command -v claude'
                 ;;
               ai)
-                run_profile ai codex claude
+                run_profile ai
+                assert_managed_app task-handoff-ai-ci codex
+                assert_managed_app task-handoff-ai-ci claude
+                ! docker exec task-handoff-ai-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-ai-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-ai-ci sh -lc 'command -v chromium'
                 ;;
               webcap)
-                run_profile webcap codex claude chromium vncserver web-cap
+                run_profile webcap chromium vncserver web-cap
+                assert_managed_app task-handoff-webcap-ci codex
+                assert_managed_app task-handoff-webcap-ci claude
+                ! docker exec task-handoff-webcap-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-webcap-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-webcap-ci sh -lc 'command -v code-server'
                 ;;
               bcap)
-                run_profile bcap codex claude chromium vncserver
+                run_profile bcap chromium vncserver
+                assert_managed_app task-handoff-bcap-ci codex
+                assert_managed_app task-handoff-bcap-ci claude
+                ! docker exec task-handoff-bcap-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-bcap-ci sh -lc 'command -v claude'
                 docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.codex/skills/bcap/SKILL.md'
                 docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.agents/skills/bcap/SKILL.md'
                 docker exec task-handoff-bcap-ci sh -lc 'test -f /home/agent/.claude/skills/bcap/SKILL.md'
@@ -493,7 +538,11 @@ jobs:
                 ! docker exec task-handoff-bcap-ci sh -lc 'command -v web-cap'
                 ;;
               browser)
-                run_profile browser codex claude chromium vncserver code-server
+                run_profile browser chromium vncserver code-server
+                assert_managed_app task-handoff-browser-ci codex
+                assert_managed_app task-handoff-browser-ci claude
+                ! docker exec task-handoff-browser-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-browser-ci sh -lc 'command -v claude'
                 ! docker exec task-handoff-browser-ci sh -lc 'command -v web-cap'
                 ;;
             esac

@@ -224,7 +224,7 @@ test("Docker CI builds amd64 and arm64 concurrently and publishes a multi-archit
   assert.match(workflow, /target: profile-webcap/);
   assert.match(workflow, /target: profile-bcap/);
   assert.match(workflow, /target: profile-browser/);
-  assert.match(workflow, /run_profile obscura codex obscura obscura-worker/);
+  assert.match(workflow, /run_profile obscura obscura obscura-worker/);
   assert.match(workflow, /docker exec task-handoff-obscura-ci obscura --version/);
   assert.match(workflow, /sha_tag="docker-sha-\$\{GITHUB_SHA\}-\$\{\{ matrix\.arch \}\}"/);
   assert.match(workflow, /"\$\{image\}:\$\{sha_tag\}-amd64"/);
@@ -318,6 +318,19 @@ test("Docker workflow builds and publishes only affected image profiles", () => 
   assert.match(workflow, /desktop-minimal\) image_name="\$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME"/);
   assert.match(workflow, /desktop-xfce\) image_name="\$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME"/);
   assert.match(workflow, /desktop-xfce[\s\S]*test -f \/usr\/share\/xsessions\/xfce\.desktop/);
+});
+
+test("Docker smoke tests verify native apps through managed app seeds", () => {
+  const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "docker.yml"), "utf8");
+
+  assert.match(workflow, /assert_managed_app\(\)/);
+  assert.match(workflow, /install-native-app\.mjs "\$app" --print-launcher/);
+  assert.match(workflow, /\/data\/task-handoff\/managed-apps\/native\/\$\{app\}/);
+  assert.match(workflow, /assert_no_managed_app task-handoff-base-ci codex/);
+  assert.match(workflow, /assert_managed_app task-handoff-codex-ci codex/);
+  assert.match(workflow, /assert_managed_app task-handoff-opencode-ci opencode/);
+  assert.match(workflow, /assert_managed_app task-handoff-browser-ci claude/);
+  assert.doesNotMatch(workflow, /run_profile (?:codex codex|obscura codex|rea codex|opencode opencode|ai codex claude|webcap codex claude|bcap codex claude|browser codex claude)/);
 });
 
 test("Docker publication is gated by current and N-1 published TaskHandoff runtimes", () => {
