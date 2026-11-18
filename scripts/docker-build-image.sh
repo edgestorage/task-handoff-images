@@ -5,6 +5,18 @@ cd "$(dirname "$0")/.."
 
 IMAGE_PROFILE="${TASK_HANDOFF_IMAGE_PROFILE:-browser}"
 case "${IMAGE_PROFILE}" in
+  base)
+    BUILD_TARGET="profile-base"
+    DEFAULT_IMAGE_REF="task-handoff-controlled-base:local"
+    ;;
+  desktop-minimal)
+    BUILD_TARGET="profile-desktop-minimal"
+    DEFAULT_IMAGE_REF="task-handoff-controlled-desktop-minimal:local"
+    ;;
+  desktop-xfce)
+    BUILD_TARGET="profile-desktop-xfce"
+    DEFAULT_IMAGE_REF="task-handoff-controlled-desktop-xfce:local"
+    ;;
   codex)
     BUILD_TARGET="profile-codex"
     DEFAULT_IMAGE_REF="task-handoff-controlled-codex:local"
@@ -38,7 +50,7 @@ case "${IMAGE_PROFILE}" in
     DEFAULT_IMAGE_REF="task-handoff-controlled-browser:local"
     ;;
   *)
-    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected codex, obscura, rea, opencode, ai, webcap, bcap, or browser)" >&2
+    echo "Unsupported TASK_HANDOFF_IMAGE_PROFILE: ${IMAGE_PROFILE} (expected base, desktop-minimal, desktop-xfce, codex, obscura, rea, opencode, ai, webcap, bcap, or browser)" >&2
     exit 1
     ;;
 esac

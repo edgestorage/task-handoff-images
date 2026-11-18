@@ -6,6 +6,36 @@
   "historyTagLimit": 6,
   "profiles": [
     {
+      "profile": "base",
+      "id": "market_taskhandoff_base",
+      "slug": "base",
+      "name": "TaskHandoff Base",
+      "description": "Base runtime with terminal only. No AI CLIs, browser, VNC, or desktop environment is bundled.",
+      "localizedDescriptions": { "zh-CN": "仅包含终端的基础运行环境，不预装 AI CLI、浏览器、VNC 或桌面环境。" },
+      "capabilities": ["terminal"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "desktop-minimal",
+      "id": "market_taskhandoff_desktop_minimal",
+      "slug": "desktop-minimal",
+      "name": "TaskHandoff Desktop Minimal",
+      "description": "Minimal X11 desktop with Xvfb, Openbox, Tint2, jgmenu, and terminal. No AI CLIs, browser, VNC, or Remote Desktop is bundled.",
+      "localizedDescriptions": { "zh-CN": "包含 Xvfb、Openbox、Tint2、jgmenu 和终端的最小 X11 桌面，不预装 AI CLI、浏览器、VNC 或远程桌面。" },
+      "capabilities": ["terminal"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
+      "profile": "desktop-xfce",
+      "id": "market_taskhandoff_desktop_xfce",
+      "slug": "desktop-xfce",
+      "name": "TaskHandoff Desktop Xfce",
+      "description": "Complete X11 Xfce desktop with D-Bus and terminal. No AI CLIs, browser, VNC, or Remote Desktop is bundled.",
+      "localizedDescriptions": { "zh-CN": "包含 D-Bus 和终端的完整 X11 Xfce 桌面，不预装 AI CLI、浏览器、VNC 或远程桌面。" },
+      "capabilities": ["terminal"],
+      "optionalApps": ["terminal-tty"]
+    },
+    {
       "profile": "codex",
       "id": "market_taskhandoff_codex",
       "slug": "codex",

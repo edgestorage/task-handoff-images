@@ -3,10 +3,13 @@
 TaskHandoff Node Agent 受管 Docker 实例使用的公开 Linux 基础镜像。这是
 [TaskHandoff](https://github.com/edgestorage/task-handoff) 的镜像侧仓库：应用
 主仓拥有控制平面和 Node Agent，本仓库拥有这些 agent 运行的基础镜像。本仓库从
-共享分层构建八个 profile：
+共享分层构建十一种 profile：
 
 | 镜像 | 能力 |
 | --- | --- |
+| `task-handoff-controlled-base` | 仅 Terminal，不预装 AI CLI、浏览器、VNC 或桌面环境 |
+| `task-handoff-controlled-desktop-minimal` | Terminal、Xvfb、Openbox、Tint2、jgmenu、xterm 和 X11 工具 |
+| `task-handoff-controlled-desktop-xfce` | Terminal 和完整 X11 Xfce 会话 |
 | `task-handoff-controlled-codex` | Terminal、Codex |
 | `task-handoff-controlled-obscura` | Terminal、Codex、Obscura |
 | `task-handoff-controlled-rea` | Terminal、Codex、REA、Linux 逆向工具链 |
@@ -27,6 +30,11 @@ tarball、校验完整性，并预置到
 `npm install`。新建实例的数据卷会继承这份预置内容；已有数据卷不会被镜像
 更新覆盖，需要通过 App management 安装或更新这些应用。
 
+Base、Desktop Minimal 和 Desktop Xfce 刻意不预置 Codex、OpenCode、Claude、
+Chromium、KasmVNC、noVNC、WebCap、BCap、code-server 或 Remote Desktop。它们
+在 market 中只声明 `terminal` capability；AI CLI 和 Remote Desktop 应在实例
+创建后通过 App management 安装。
+
 REA profile 会安装 REA 本体，并配好 `reverse-engineer-anything` agent skill 和
 Codex MCP 注册；同时预装 REA 可直接驱动的 Linux 工具链：Chromium（网站分析）、
 JDK 21（Ghidra 与 JADX）、pwntools（离线 ELF 与 crash 记录分析）、mitmproxy
@@ -46,12 +54,32 @@ IDA（`REA_IDA_MCP_CONFIG`）、headless JADX（`REA_JADX_MCP_JAR`）、binwalk
 
 ```sh
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=base ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=desktop-minimal ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=desktop-xfce ./scripts/docker-build-image.sh
 ```
 
-支持 `codex`、`obscura`、`rea`、`opencode`、`ai`、`webcap`、`bcap` 和
-`browser`。
+按 market 顺序支持 `base`、`desktop-minimal`、`desktop-xfce`、`codex`、
+`obscura`、`rea`、`opencode`、`ai`、`webcap`、`bcap` 和 `browser`。
 `TASK_HANDOFF_IMAGE_REF` 可以覆盖本地镜像 tag。工具版本默认固定；其他版本
 构建参数只用于本地测试。
+
+## 桌面会话
+
+Remote Desktop 是可选受管 App，不打进这些镜像。Linux 上它优先尝试现有 X11
+`DISPLAY`，验证认证、采集 visual、SHM、Damage、XFixes、RandR、Composite 和
+XTest；已有窗口管理器时直接复用。可连接但没有窗口管理器的 X server 会启动
+发现的桌面会话，现有 display 不可用时才创建由 Remote Desktop 持有的 Xvfb。
+
+标准 X11 会话从 `/usr/local/share/xsessions` 和 `/usr/share/xsessions` 发现。
+标记为隐藏、格式错误、不可执行或 `TryExec` 缺失的条目会被忽略；标准会话通过
+`dbus-run-session` 启动。安装多个有效会话时，用
+`TASK_HANDOFF_DESKTOP_SESSION` 指定 session id、`Name` 或任一 `DesktopNames`；
+仍无法唯一确定时返回 `REMOTE_DESKTOP_DESKTOP_UNAVAILABLE`。
+
+Desktop Minimal 不提供标准 X11 session entry，使用内置 Openbox、Tint2 和 jgmenu
+回退桌面。Desktop Xfce 提供标准 `xfce.desktop` 会话。已接管的 X server 不会被
+终止，Remote Desktop 只停止自己创建的 Xvfb 或桌面进程组。
 
 ## 发布
 

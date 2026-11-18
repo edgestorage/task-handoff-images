@@ -77,6 +77,81 @@ RUN rm -rf /tmp/.X11-unix \
   && mkdir -p /tmp/.X11-unix \
   && chmod 1777 /tmp/.X11-unix
 
+FROM runtime-core AS profile-base-root
+
+FROM profile-base-root AS profile-desktop-minimal-root
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    fonts-dejavu-core \
+    fonts-liberation \
+    jgmenu \
+    libice6 \
+    libsm6 \
+    libx11-6 \
+    libxcb-shm0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libxrender1 \
+    libxtst6 \
+    openbox \
+    tint2 \
+    x11-utils \
+    x11-xserver-utils \
+    xauth \
+    xterm \
+    xvfb \
+  ; \
+  rm -f /usr/share/xsessions/openbox.desktop /usr/local/share/xsessions/openbox.desktop; \
+  rm -rf /var/lib/apt/lists/*; \
+  test -z "$(find /usr/share/xsessions /usr/local/share/xsessions -maxdepth 1 -name '*.desktop' -print -quit 2>/dev/null)"; \
+  for command in Xvfb xauth openbox tint2 jgmenu xterm; do command -v "${command}"; done
+
+FROM profile-base-root AS profile-desktop-xfce-root
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    adwaita-icon-theme \
+    dbus-x11 \
+    desktop-file-utils \
+    fonts-dejavu-core \
+    fonts-liberation \
+    hicolor-icon-theme \
+    libice6 \
+    libsm6 \
+    libx11-6 \
+    libxcb-shm0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxrandr2 \
+    libxrender1 \
+    libxtst6 \
+    shared-mime-info \
+    thunar \
+    x11-utils \
+    x11-xserver-utils \
+    xauth \
+    xfce4 \
+    xfce4-appfinder \
+    xfce4-panel \
+    xfce4-session \
+    xfce4-settings \
+    xfce4-terminal \
+    xfconf \
+    xfdesktop4 \
+    xfwm4 \
+    xvfb \
+  ; \
+  rm -rf /var/lib/apt/lists/*; \
+  test -f /usr/share/xsessions/xfce.desktop; \
+  test -x /usr/bin/startxfce4; \
+  for command in Xvfb xauth dbus-run-session startxfce4 xfce4-session xfwm4 thunar xfce4-terminal; do command -v "${command}"; done
+
 # Install profile layers before volatile metadata so profile builds share all
 # expensive application, CLI, and system package layers.
 FROM runtime-core AS profile-codex-root
@@ -282,6 +357,66 @@ RUN set -eux; \
 
 # Each exported target has its own immutable profile declaration and build
 # identity while inheriting the shared filesystem layers above.
+FROM profile-base-root AS profile-base
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-base:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=base
+LABEL io.task-handoff.image.capabilities=terminal
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
+FROM profile-desktop-minimal-root AS profile-desktop-minimal
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-desktop-minimal:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=desktop-minimal
+LABEL io.task-handoff.image.capabilities=terminal
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
+FROM profile-desktop-xfce-root AS profile-desktop-xfce
+ARG TASK_HANDOFF_BUILD_ID=local
+ARG TASK_HANDOFF_BUILT_AT=unknown
+ARG TASK_HANDOFF_GIT_COMMIT=
+ARG TASK_HANDOFF_IMAGE_REF=task-handoff-controlled-desktop-xfce:local
+ARG TASK_HANDOFF_IMAGE_DIGEST=
+ENV TASK_HANDOFF_BUILD_ID=${TASK_HANDOFF_BUILD_ID}
+ENV TASK_HANDOFF_BUILT_AT=${TASK_HANDOFF_BUILT_AT}
+ENV TASK_HANDOFF_GIT_COMMIT=${TASK_HANDOFF_GIT_COMMIT}
+ENV TASK_HANDOFF_IMAGE_REF=${TASK_HANDOFF_IMAGE_REF}
+ENV TASK_HANDOFF_IMAGE_DIGEST=${TASK_HANDOFF_IMAGE_DIGEST}
+LABEL io.task-handoff.image.profile=desktop-xfce
+LABEL io.task-handoff.image.capabilities=terminal
+
+USER agent
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD ["task-handoff-healthcheck"]
+ENTRYPOINT ["tini", "--", "task-handoff-image-entrypoint"]
+CMD ["task-handoff", "web"]
+
 FROM profile-codex-root AS profile-codex
 ARG TASK_HANDOFF_BUILD_ID=local
 ARG TASK_HANDOFF_BUILT_AT=unknown

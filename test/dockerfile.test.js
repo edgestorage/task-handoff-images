@@ -27,13 +27,16 @@ test("Docker profiles run as agent with passwordless container-root escalation",
   assert.match(dockerfile, /printf 'agent ALL=\(root\) NOPASSWD: ALL\\n' > \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /chmod 0440 \/etc\/sudoers\.d\/task-handoff-agent/);
   assert.match(dockerfile, /visudo -cf \/etc\/sudoers\.d\/task-handoff-agent/);
-  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 8);
+  assert.equal((dockerfile.match(/^USER agent$/gm) || []).length, 11);
 });
 
-test("Docker exports Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browser image profiles from shared layers", () => {
+test("Docker exports Base, Desktop Minimal, Desktop Xfce, Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browser image profiles from shared layers", () => {
   const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
   const buildScript = fs.readFileSync(path.join(root, "scripts", "docker-build-image.sh"), "utf8");
 
+  assert.match(dockerfile, /FROM runtime-core AS profile-base-root/);
+  assert.match(dockerfile, /FROM profile-base-root AS profile-desktop-minimal-root/);
+  assert.match(dockerfile, /FROM profile-base-root AS profile-desktop-xfce-root/);
   assert.match(dockerfile, /FROM runtime-core AS profile-codex-root/);
   assert.match(dockerfile, /FROM profile-codex-root AS profile-obscura-root/);
   assert.match(dockerfile, /FROM profile-codex-root AS profile-rea-root/);
@@ -44,6 +47,7 @@ test("Docker exports Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browse
   assert.match(dockerfile, /FROM profile-gui-root AS profile-bcap-root/);
   assert.match(dockerfile, /FROM profile-gui-root AS profile-browser-root/);
   assert.doesNotMatch(dockerfile, /ENV TASK_HANDOFF_IMAGE_(?:PROFILE|CAPABILITIES)=/);
+  assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal\n/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,obscura/);
   assert.match(dockerfile, /io\.task-handoff\.image\.capabilities=terminal,codex,rea/);
@@ -58,7 +62,36 @@ test("Docker exports Codex, Obscura, REA, OpenCode, AI, WebCap, BCap, and Browse
   assert.match(buildScript, /obscura\)\n\s+BUILD_TARGET="profile-obscura"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-obscura:local"/);
   assert.match(buildScript, /rea\)\n\s+BUILD_TARGET="profile-rea"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-rea:local"/);
   assert.match(buildScript, /bcap\)\n\s+BUILD_TARGET="profile-bcap"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-bcap:local"/);
+  assert.match(buildScript, /base\)\n\s+BUILD_TARGET="profile-base"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-base:local"/);
+  assert.match(buildScript, /desktop-minimal\)\n\s+BUILD_TARGET="profile-desktop-minimal"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-desktop-minimal:local"/);
+  assert.match(buildScript, /desktop-xfce\)\n\s+BUILD_TARGET="profile-desktop-xfce"\n\s+DEFAULT_IMAGE_REF="task-handoff-controlled-desktop-xfce:local"/);
   assert.match(buildScript, /REA_AGENTS_PACKAGE=\$\{REA_AGENTS_PACKAGE:-rea-agents@\d+\.\d+\.\d+\}/);
+});
+
+test("Docker desktop image roots expose only terminal prerequisites and exclude managed graphical stacks", () => {
+  const dockerfile = fs.readFileSync(path.join(root, "Dockerfile"), "utf8");
+  const minimalStart = dockerfile.indexOf("FROM profile-base-root AS profile-desktop-minimal-root");
+  const xfceStart = dockerfile.indexOf("FROM profile-base-root AS profile-desktop-xfce-root");
+  const codexStart = dockerfile.indexOf("FROM runtime-core AS profile-codex-root");
+
+  assert.ok(minimalStart >= 0 && xfceStart > minimalStart && codexStart > xfceStart);
+  const minimal = dockerfile.slice(minimalStart, xfceStart);
+  const xfce = dockerfile.slice(xfceStart, codexStart);
+
+  for (const root of [minimal, xfce]) {
+    assert.match(root, /\bxvfb\b/);
+    assert.match(root, /\bxauth\b/);
+    assert.match(root, /\bx11-utils\b/);
+    assert.doesNotMatch(root, /codex|opencode|claude|chromium|kasmvnc|novnc|code-server/i);
+  }
+  assert.match(minimal, /\bopenbox\b[\s\S]*\btint2\b[\s\S]*\bjgmenu\b[\s\S]*\bxterm\b/);
+  assert.match(minimal, /rm -f \/usr\/share\/xsessions\/openbox\.desktop/);
+  assert.match(xfce, /\bxfce4\b[\s\S]*\bxfce4-session\b[\s\S]*\bxfwm4\b[\s\S]*\bthunar\b/);
+  assert.match(xfce, /\bdbus-x11\b/);
+  assert.match(xfce, /test -f \/usr\/share\/xsessions\/xfce\.desktop/);
+  assert.match(dockerfile, /LABEL io\.task-handoff\.image\.profile=base\nLABEL io\.task-handoff\.image\.capabilities=terminal\n/);
+  assert.match(dockerfile, /LABEL io\.task-handoff\.image\.profile=desktop-minimal\nLABEL io\.task-handoff\.image\.capabilities=terminal\n/);
+  assert.match(dockerfile, /LABEL io\.task-handoff\.image\.profile=desktop-xfce\nLABEL io\.task-handoff\.image\.capabilities=terminal\n/);
 });
 
 test("Docker BCap profile installs the pinned bcap skill on the chromium base", () => {
@@ -277,6 +310,14 @@ test("Docker workflow builds and publishes only affected image profiles", () => 
   assert.match(workflow, /TASK_HANDOFF_IMAGE_PROFILES: \$\{\{ needs\.detect-changes\.outputs\.profiles_space \}\}/);
   assert.match(workflow, /mapfile -t profiles < <\(node -e[\s\S]*needs\.detect-changes\.outputs\.profiles/);
   assert.match(workflow, /initial_profiles[\s\S]*tags\+=\(--tag "\$\{image\}:latest"\)/);
+  assert.match(workflow, /DOCKERHUB_BASE_IMAGE_NAME/);
+  assert.match(workflow, /DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME/);
+  assert.match(workflow, /DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME/);
+  assert.match(workflow, /target: profile-base[\s\S]*target: profile-desktop-minimal[\s\S]*target: profile-desktop-xfce/);
+  assert.match(workflow, /base\) image_name="\$DOCKERHUB_BASE_IMAGE_NAME"/);
+  assert.match(workflow, /desktop-minimal\) image_name="\$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME"/);
+  assert.match(workflow, /desktop-xfce\) image_name="\$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME"/);
+  assert.match(workflow, /desktop-xfce[\s\S]*test -f \/usr\/share\/xsessions\/xfce\.desktop/);
 });
 
 test("Docker publication is gated by current and N-1 published TaskHandoff runtimes", () => {
@@ -291,7 +332,7 @@ test("Docker publication is gated by current and N-1 published TaskHandoff runti
   assert.match(resolver, /\{ channel: "current", version: latest \}/);
   assert.match(resolver, /\{ channel: "n-1", version: stableVersions\[latestIndex - 1\] \}/);
   assert.match(compatibility, /npm install[\s\S]*"@task-handoff\/node-agent@\$\{version\}"/);
-  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-codex obscura rea opencode ai webcap bcap browser/);
+  assert.match(compatibility, /TASK_HANDOFF_IMAGE_PROFILES:-base desktop-minimal desktop-xfce codex obscura rea opencode ai webcap bcap browser/);
   assert.match(compatibility, /runtime-installer\.mjs install/);
   assert.match(compatibility, /docker restart/);
   assert.match(compatibility, /\/api\/health/);

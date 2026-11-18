@@ -4,10 +4,13 @@ Public Linux base images for TaskHandoff Node Agent-managed Docker instances.
 This repository is the image side of
 [TaskHandoff](https://github.com/edgestorage/task-handoff): the application
 repository owns the control plane and Node Agent, while this repository owns the
-base images those agents run. It builds eight profiles from shared layers:
+base images those agents run. It builds eleven profiles from shared layers:
 
 | Image | Capabilities |
 | --- | --- |
+| `task-handoff-controlled-base` | Terminal only; no AI CLI, browser, VNC, or desktop environment |
+| `task-handoff-controlled-desktop-minimal` | Terminal, Xvfb, Openbox, Tint2, jgmenu, xterm, and X11 utilities |
+| `task-handoff-controlled-desktop-xfce` | Terminal and a complete X11 Xfce session |
 | `task-handoff-controlled-codex` | Terminal and Codex |
 | `task-handoff-controlled-obscura` | Terminal, Codex, and Obscura |
 | `task-handoff-controlled-rea` | Terminal, Codex, REA, and Linux reverse-engineering tools |
@@ -31,6 +34,11 @@ and seeds them under
 volumes are not rewritten by an image update, so use App management to install
 or update those apps.
 
+The Base, Desktop Minimal, and Desktop Xfce profiles intentionally do not seed
+Codex, OpenCode, Claude, Chromium, KasmVNC, noVNC, WebCap, BCap, code-server, or
+Remote Desktop. Their market capability is `terminal` only. Install AI CLIs and
+Remote Desktop later through App management.
+
 The REA profile installs REA together with its `reverse-engineer-anything`
 agent skill and the Codex MCP registration, plus the Linux toolchain REA drives
 directly: Chromium for website analysis, JDK 21 for Ghidra and JADX, pwntools
@@ -52,12 +60,37 @@ Select another profile with `TASK_HANDOFF_IMAGE_PROFILE`:
 
 ```sh
 TASK_HANDOFF_IMAGE_PROFILE=codex ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=base ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=desktop-minimal ./scripts/docker-build-image.sh
+TASK_HANDOFF_IMAGE_PROFILE=desktop-xfce ./scripts/docker-build-image.sh
 ```
 
-Supported values are `codex`, `obscura`, `rea`, `opencode`, `ai`, `webcap`,
-`bcap`, and `browser`.
+Supported values, in market order, are `base`, `desktop-minimal`,
+`desktop-xfce`, `codex`, `obscura`, `rea`, `opencode`, `ai`, `webcap`, `bcap`,
+and `browser`.
 `TASK_HANDOFF_IMAGE_REF` overrides the local image tag. Tool versions are
 pinned by default; override their build arguments only for local testing.
+
+## Desktop sessions
+
+Remote Desktop is an optional managed app, not part of these images. On Linux it
+first tries the existing X11 `DISPLAY`, validates authentication, the capture
+visual, SHM, Damage, XFixes, RandR, Composite, and XTest, then reuses an existing
+window manager when present. A reachable bare X server receives a discovered
+desktop session, while an unavailable display falls back to an owned Xvfb.
+
+Standard X11 sessions are discovered from `/usr/local/share/xsessions` and
+`/usr/share/xsessions`. Hidden, malformed, non-executable, or `TryExec`-missing
+entries are ignored, and a standard session is launched through
+`dbus-run-session`. If more than one valid session is installed, set
+`TASK_HANDOFF_DESKTOP_SESSION` to the session id, `Name`, or one of its
+`DesktopNames`; an unresolved ambiguity returns
+`REMOTE_DESKTOP_DESKTOP_UNAVAILABLE`.
+
+Desktop Minimal has no standard X11 session entry and uses the built-in Openbox,
+Tint2, and jgmenu fallback. Desktop Xfce exposes the standard `xfce.desktop`
+session. Attached X servers are never terminated, and only Xvfb or desktop
+process groups created by Remote Desktop are stopped.
 
 ## Releases
 

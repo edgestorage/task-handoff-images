@@ -3,11 +3,14 @@
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-export const ALL_PROFILES = ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
+export const ALL_PROFILES = ["base", "desktop-minimal", "desktop-xfce", "codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
 
 const STAGE_PROFILES = new Map([
   ["runtime-base", ALL_PROFILES],
   ["runtime-core", ALL_PROFILES],
+  ["profile-base-root", ["base", "desktop-minimal", "desktop-xfce"]],
+  ["profile-desktop-minimal-root", ["desktop-minimal"]],
+  ["profile-desktop-xfce-root", ["desktop-xfce"]],
   ["profile-codex-root", ["codex", "obscura", "rea", "ai", "webcap", "bcap", "browser"]],
   ["profile-obscura-root", ["obscura"]],
   ["profile-rea-root", ["rea"]],
@@ -17,6 +20,9 @@ const STAGE_PROFILES = new Map([
   ["profile-webcap-root", ["webcap"]],
   ["profile-bcap-root", ["bcap"]],
   ["profile-browser-root", ["browser"]],
+  ["profile-base", ["base"]],
+  ["profile-desktop-minimal", ["desktop-minimal"]],
+  ["profile-desktop-xfce", ["desktop-xfce"]],
   ["profile-codex", ["codex"]],
   ["profile-obscura", ["obscura"]],
   ["profile-rea", ["rea"]],

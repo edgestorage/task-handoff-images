@@ -53,6 +53,9 @@ test "${runtime_identity[0]}" = "${version}"
 
 profile_capabilities() {
   case "$1" in
+    base) echo "terminal" ;;
+    desktop-minimal) echo "terminal" ;;
+    desktop-xfce) echo "terminal" ;;
     codex) echo "terminal,codex" ;;
     obscura) echo "terminal,codex,obscura" ;;
     rea) echo "terminal,codex,rea" ;;
@@ -65,7 +68,7 @@ profile_capabilities() {
   esac
 }
 
-readonly image_profiles="${TASK_HANDOFF_IMAGE_PROFILES:-codex obscura rea opencode ai webcap bcap browser}"
+readonly image_profiles="${TASK_HANDOFF_IMAGE_PROFILES:-base desktop-minimal desktop-xfce codex obscura rea opencode ai webcap bcap browser}"
 for profile in ${image_profiles}; do
   profile_capabilities "${profile}" >/dev/null
   safe_version="${version//./-}"

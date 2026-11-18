@@ -12,6 +12,9 @@ test("profile path changes select only dependent images", async () => {
   assert.deepEqual(profilesForPaths(["LICENSE"]), ["obscura"]);
   assert.deepEqual(profilesForPaths(["README.md", "test/dockerfile.test.js"]), []);
   assert.deepEqual(profilesForPaths(["docker/image-entrypoint.sh"]), [
+    "base",
+    "desktop-minimal",
+    "desktop-xfce",
     "codex",
     "obscura",
     "rea",
@@ -28,6 +31,12 @@ test("Dockerfile stage changes follow the image inheritance graph", async () => 
   const dockerfile = [
     "FROM node AS runtime-base",
     "RUN true",
+    "FROM runtime-base AS profile-base-root",
+    "RUN true",
+    "FROM profile-base-root AS profile-desktop-minimal-root",
+    "RUN true",
+    "FROM profile-base-root AS profile-desktop-xfce-root",
+    "RUN true",
     "FROM runtime-base AS profile-codex-root",
     "RUN true",
     "FROM profile-codex-root AS profile-obscura-root",
@@ -39,15 +48,23 @@ test("Dockerfile stage changes follow the image inheritance graph", async () => 
   ].join("\n");
 
   assert.deepEqual(
-    profilesForDockerDiff(dockerfile, dockerfile, "@@ -6 +6 @@\n-RUN false\n+RUN true"),
+    profilesForDockerDiff(dockerfile, dockerfile, "@@ -12 +12 @@\n-RUN false\n+RUN true"),
     ["obscura"],
   );
   assert.deepEqual(
-    profilesForDockerDiff(dockerfile, dockerfile, "@@ -4 +4 @@\n-RUN false\n+RUN true"),
+    profilesForDockerDiff(dockerfile, dockerfile, "@@ -10 +10 @@\n-RUN false\n+RUN true"),
     ["codex", "obscura", "rea", "ai", "webcap", "bcap", "browser"],
   );
   assert.deepEqual(
-    profilesForDockerDiff(dockerfile, dockerfile, "@@ -2 +2 @@\n-RUN false\n+RUN true"),
-    ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"],
+    profilesForDockerDiff(dockerfile, dockerfile, "@@ -6 +6 @@\n-RUN false\n+RUN true"),
+    ["desktop-minimal"],
+  );
+  assert.deepEqual(
+    profilesForDockerDiff(dockerfile, dockerfile, "@@ -8 +8 @@\n-RUN false\n+RUN true"),
+    ["desktop-xfce"],
+  );
+  assert.deepEqual(
+    profilesForDockerDiff(dockerfile, dockerfile, "@@ -4 +4 @@\n-RUN false\n+RUN true"),
+    ["base", "desktop-minimal", "desktop-xfce"],
   );
 });

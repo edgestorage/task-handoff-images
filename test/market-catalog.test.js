@@ -61,6 +61,22 @@ test("market profiles stay in sync with Dockerfile labels", async () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+test("base and desktop profiles lead the market with terminal-only metadata", () => {
+  const leading = metadata.profiles.slice(0, 3);
+  assert.deepEqual(leading.map((entry) => entry.profile), ["base", "desktop-minimal", "desktop-xfce"]);
+  for (const profile of leading) {
+    assert.deepEqual(profile.capabilities, ["terminal"]);
+    assert.deepEqual(profile.optionalApps, ["terminal-tty"]);
+    assert.match(profile.description, /No AI CLIs, browser, VNC/);
+    assert.ok(profile.localizedDescriptions["zh-CN"]);
+  }
+  assert.deepEqual(
+    metadata.profiles.slice(3).map((entry) => entry.profile),
+    ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"],
+  );
+  assert.equal(metadata.profiles.find((entry) => entry.profile === "ai").hidden, true);
+});
+
 test("selectCatalogTags keeps channels plus the newest version tags", async () => {
   const { selectCatalogTags } = await catalog();
   const selected = selectCatalogTags([

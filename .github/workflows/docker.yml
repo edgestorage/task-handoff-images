@@ -27,6 +27,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  DOCKERHUB_BASE_IMAGE_NAME: ${{ vars.DOCKERHUB_BASE_IMAGE_NAME || 'task-handoff-controlled-base' }}
+  DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME: ${{ vars.DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME || 'task-handoff-controlled-desktop-minimal' }}
+  DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME: ${{ vars.DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME || 'task-handoff-controlled-desktop-xfce' }}
   DOCKERHUB_CODEX_IMAGE_NAME: ${{ vars.DOCKERHUB_CODEX_IMAGE_NAME || 'task-handoff-controlled-codex' }}
   DOCKERHUB_OBSCURA_IMAGE_NAME: ${{ vars.DOCKERHUB_OBSCURA_IMAGE_NAME || 'task-handoff-controlled-obscura' }}
   DOCKERHUB_REA_IMAGE_NAME: ${{ vars.DOCKERHUB_REA_IMAGE_NAME || 'task-handoff-controlled-rea' }}
@@ -80,6 +83,9 @@ jobs:
 
           if [[ "$IS_RELEASE" == true ]]; then
             for entry in \
+              "base:${DOCKERHUB_BASE_IMAGE_NAME}" \
+              "desktop-minimal:${DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME}" \
+              "desktop-xfce:${DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME}" \
               "codex:${DOCKERHUB_CODEX_IMAGE_NAME}" \
               "obscura:${DOCKERHUB_OBSCURA_IMAGE_NAME}" \
               "rea:${DOCKERHUB_REA_IMAGE_NAME}" \
@@ -97,13 +103,13 @@ jobs:
                 initial_profiles="$(node -e '
                   const profiles = new Set(JSON.parse(process.argv[1]));
                   profiles.add(process.argv[2]);
-                  const order = ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
+                  const order = ["base", "desktop-minimal", "desktop-xfce", "codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
                   process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
                 ' "$initial_profiles" "$profile")"
                 profiles="$(node -e '
                   const profiles = new Set(JSON.parse(process.argv[1]));
                   profiles.add(process.argv[2]);
-                  const order = ["codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
+                  const order = ["base", "desktop-minimal", "desktop-xfce", "codex", "obscura", "rea", "opencode", "ai", "webcap", "bcap", "browser"];
                   process.stdout.write(JSON.stringify(order.filter((profile) => profiles.has(profile))));
                 ' "$profiles" "$profile")"
               fi
@@ -156,6 +162,9 @@ jobs:
           fi
           echo "value=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "base-image-ref=${DOCKERHUB_BASE_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
+          echo "desktop-minimal-image-ref=${DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
+          echo "desktop-xfce-image-ref=${DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "codex-image-ref=${DOCKERHUB_CODEX_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "obscura-image-ref=${DOCKERHUB_OBSCURA_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
           echo "rea-image-ref=${DOCKERHUB_REA_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
@@ -166,6 +175,60 @@ jobs:
           echo "browser-image-ref=${DOCKERHUB_BROWSER_IMAGE_NAME}:${tag}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v4
+
+      - name: Build Base image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'base') }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          target: profile-base
+          tags: task-handoff-controlled-base:ci-${{ matrix.arch }}
+          build-args: |
+            TASK_HANDOFF_IMAGE_VERSION=${{ steps.image-version.outputs.value }}
+            TASK_HANDOFF_BUILD_ID=${{ github.run_id }}
+            TASK_HANDOFF_BUILT_AT=${{ github.event.repository.updated_at }}
+            TASK_HANDOFF_GIT_COMMIT=${{ github.sha }}
+            TASK_HANDOFF_IMAGE_REF=${{ steps.image-version.outputs.base-image-ref }}
+          cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
+
+      - name: Build Desktop Minimal image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'desktop-minimal') }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          target: profile-desktop-minimal
+          tags: task-handoff-controlled-desktop-minimal:ci-${{ matrix.arch }}
+          build-args: |
+            TASK_HANDOFF_IMAGE_VERSION=${{ steps.image-version.outputs.value }}
+            TASK_HANDOFF_BUILD_ID=${{ github.run_id }}
+            TASK_HANDOFF_BUILT_AT=${{ github.event.repository.updated_at }}
+            TASK_HANDOFF_GIT_COMMIT=${{ github.sha }}
+            TASK_HANDOFF_IMAGE_REF=${{ steps.image-version.outputs.desktop-minimal-image-ref }}
+          cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
+
+      - name: Build Desktop Xfce image
+        if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'desktop-xfce') }}
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          platforms: ${{ matrix.platform }}
+          target: profile-desktop-xfce
+          tags: task-handoff-controlled-desktop-xfce:ci-${{ matrix.arch }}
+          build-args: |
+            TASK_HANDOFF_IMAGE_VERSION=${{ steps.image-version.outputs.value }}
+            TASK_HANDOFF_BUILD_ID=${{ github.run_id }}
+            TASK_HANDOFF_BUILT_AT=${{ github.event.repository.updated_at }}
+            TASK_HANDOFF_GIT_COMMIT=${{ github.sha }}
+            TASK_HANDOFF_IMAGE_REF=${{ steps.image-version.outputs.desktop-xfce-image-ref }}
+          cache-from: type=gha,scope=docker-image-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=docker-image-${{ matrix.arch }}
 
       - name: Build Codex image
         if: ${{ contains(fromJSON(needs.detect-changes.outputs.profiles), 'codex') }}
@@ -360,6 +423,34 @@ jobs:
           mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
           for profile in "${profiles[@]}"; do
             case "$profile" in
+              base)
+                run_profile base bash git node npm python3
+                ! docker exec task-handoff-base-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-base-ci sh -lc 'command -v claude'
+                ! docker exec task-handoff-base-ci sh -lc 'command -v opencode'
+                ! docker exec task-handoff-base-ci sh -lc 'command -v chromium'
+                ! docker exec task-handoff-base-ci sh -lc 'command -v Xvfb'
+                ! docker exec task-handoff-base-ci sh -lc 'command -v vncserver'
+                docker exec task-handoff-base-ci sh -lc 'test -z "$(find /usr/share/xsessions /usr/local/share/xsessions -maxdepth 1 -name "*.desktop" -print -quit 2>/dev/null)"'
+                ;;
+              desktop-minimal)
+                run_profile desktop-minimal Xvfb xauth openbox tint2 jgmenu xterm
+                ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v claude'
+                ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v opencode'
+                ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v chromium'
+                ! docker exec task-handoff-desktop-minimal-ci sh -lc 'command -v vncserver'
+                docker exec task-handoff-desktop-minimal-ci sh -lc 'test -z "$(find /usr/share/xsessions /usr/local/share/xsessions -maxdepth 1 -name "*.desktop" -print -quit 2>/dev/null)"'
+                ;;
+              desktop-xfce)
+                run_profile desktop-xfce Xvfb xauth dbus-run-session startxfce4 xfce4-session xfwm4 thunar xfce4-terminal
+                docker exec task-handoff-desktop-xfce-ci sh -lc 'test -f /usr/share/xsessions/xfce.desktop'
+                ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v codex'
+                ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v claude'
+                ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v opencode'
+                ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v chromium'
+                ! docker exec task-handoff-desktop-xfce-ci sh -lc 'command -v vncserver'
+                ;;
               codex)
                 run_profile codex codex
                 ! docker exec task-handoff-codex-ci sh -lc 'command -v claude'
@@ -410,7 +501,7 @@ jobs:
 
       - name: Cleanup
         if: ${{ always() && matrix.arch == 'amd64' }}
-        run: docker rm -f task-handoff-codex-ci task-handoff-obscura-ci task-handoff-rea-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-bcap-ci task-handoff-browser-ci 2>/dev/null || true
+        run: docker rm -f task-handoff-base-ci task-handoff-desktop-minimal-ci task-handoff-desktop-xfce-ci task-handoff-codex-ci task-handoff-obscura-ci task-handoff-rea-ci task-handoff-opencode-ci task-handoff-ai-ci task-handoff-webcap-ci task-handoff-bcap-ci task-handoff-browser-ci 2>/dev/null || true
 
       - name: Resolve published TaskHandoff compatibility versions
         if: ${{ matrix.arch == 'amd64' }}
@@ -447,6 +538,9 @@ jobs:
           mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
           for profile in "${profiles[@]}"; do
             case "$profile" in
+              base) image_name="$DOCKERHUB_BASE_IMAGE_NAME" ;;
+              desktop-minimal) image_name="$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME" ;;
+              desktop-xfce) image_name="$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME" ;;
               codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
               obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
               rea) image_name="$DOCKERHUB_REA_IMAGE_NAME" ;;
@@ -488,6 +582,9 @@ jobs:
           mapfile -t profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.profiles }}')
           for profile in "${profiles[@]}"; do
             case "$profile" in
+              base) image_name="$DOCKERHUB_BASE_IMAGE_NAME" ;;
+              desktop-minimal) image_name="$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME" ;;
+              desktop-xfce) image_name="$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME" ;;
               codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
               obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
               rea) image_name="$DOCKERHUB_REA_IMAGE_NAME" ;;
@@ -553,6 +650,9 @@ jobs:
           mapfile -t initial_profiles < <(node -e 'for (const profile of JSON.parse(process.argv[1])) console.log(profile)' '${{ needs.detect-changes.outputs.initial_profiles }}')
           for profile in "${profiles[@]}"; do
             case "$profile" in
+              base) image_name="$DOCKERHUB_BASE_IMAGE_NAME" ;;
+              desktop-minimal) image_name="$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME" ;;
+              desktop-xfce) image_name="$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME" ;;
               codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
               obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
               rea) image_name="$DOCKERHUB_REA_IMAGE_NAME" ;;
@@ -571,6 +671,9 @@ jobs:
 
           for profile in "${profiles[@]}"; do
             case "$profile" in
+              base) image_name="$DOCKERHUB_BASE_IMAGE_NAME" ;;
+              desktop-minimal) image_name="$DOCKERHUB_DESKTOP_MINIMAL_IMAGE_NAME" ;;
+              desktop-xfce) image_name="$DOCKERHUB_DESKTOP_XFCE_IMAGE_NAME" ;;
               codex) image_name="$DOCKERHUB_CODEX_IMAGE_NAME" ;;
               obscura) image_name="$DOCKERHUB_OBSCURA_IMAGE_NAME" ;;
               rea) image_name="$DOCKERHUB_REA_IMAGE_NAME" ;;
